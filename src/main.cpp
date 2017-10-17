@@ -12,14 +12,15 @@ extern "C"
 
 
 #define PAR_DEFAULT_K 0.06
-#define PAR_DEFAULT_SIGMA 2.5
+#define PAR_DEFAULT_SIGMA_I 1.0
+#define PAR_DEFAULT_SIGMA_N 2.5
 #define PAR_DEFAULT_PERCENTAGE 0.1
 #define PAR_DEFAULT_RADIUS 5
 #define PAR_DEFAULT_NOBEL_MEASURE 0
 #define PAR_DEFAULT_VERBOSE 0
+#define PAR_DEFAULT_FORENSIC 0
 
-
-using namespace std;
+//using namespace std;
 
 
 /**
@@ -40,14 +41,18 @@ void print_help(char *name)
   printf("   -f name  write points to file\n");
   printf("   -k N     Harris' K parameter\n");
   printf("              default value %f\n", PAR_DEFAULT_K);
+  printf("   -i N     Gauss standard deviation for image denoised\n");
+  printf("              default value %f\n", PAR_DEFAULT_SIGMA_I);    
   printf("   -s N     Gauss standard deviation for weighted windows\n");
-  printf("              default value %f\n", PAR_DEFAULT_SIGMA);
+  printf("              default value %f\n", PAR_DEFAULT_SIGMA_N);
   printf("   -w N     window radius size\n");
   printf("              default value %d\n", PAR_DEFAULT_RADIUS);
   printf("   -p N     percentage with respect to the maximum for selecting points\n");
   printf("              default value %f\n", PAR_DEFAULT_PERCENTAGE);
-  printf("   -n       use Nobel's measure (does not need parameter K) \n");
-  printf("   -v       switch on verbose mode \n\n\n");
+  printf("   -n       use Nobel's measure: 0=Harris; 1=Shid-Tomasi; 2=Zseliski; ...\n"); 
+                       //(does not need parameter K) \n");
+  printf("   -v       switch on verbose mode \n");
+  printf("   -b       switch on forensic mode \n\n\n");  
 }
 
 
@@ -60,15 +65,18 @@ void print_help(char *name)
 int read_parameters(
   int   argc, 
   char  *argv[], 
-  char  **image,
+  char  **image,  
   char  **out_image,
   char  **out_file,
   float &k,
-  float &sigma,
+  float &sigma_i,  
+  float &sigma_n,
   int   &radius,
   float &percentage,
   int   &nobel_measure,
-  int   &verbose
+  float &noise_threshold,  
+  int   &verbose,
+  int   &forensic 
 )
 {
   if (argc < 2){
@@ -81,9 +89,11 @@ int read_parameters(
 
     //assign default values to the parameters
     k=PAR_DEFAULT_K;
-    sigma=PAR_DEFAULT_SIGMA;
+    sigma_i=PAR_DEFAULT_SIGMA_I;    
+    sigma_n=PAR_DEFAULT_SIGMA_N;
     radius=PAR_DEFAULT_RADIUS;
     verbose=PAR_DEFAULT_VERBOSE;
+    forensic=PAR_DEFAULT_FORENSIC;
     percentage=PAR_DEFAULT_PERCENTAGE;
     nobel_measure=PAR_DEFAULT_NOBEL_MEASURE;
     
@@ -102,9 +112,13 @@ int read_parameters(
         if(i<argc-1)
           k=atof(argv[++i]);
 
+      if(strcmp(argv[i],"-i")==0)
+        if(i<argc-1)
+          sigma_i=atof(argv[++i]);        
+        
       if(strcmp(argv[i],"-s")==0)
         if(i<argc-1)
-          sigma=atof(argv[++i]);
+          sigma_n=atof(argv[++i]);
         
       if(strcmp(argv[i],"-w")==0)
         if(i<argc-1)
@@ -115,23 +129,25 @@ int read_parameters(
           percentage=atof(argv[++i]);
 
       if(strcmp(argv[i],"-n")==0)
-        nobel_measure=1;
+        nobel_measure=atoi(argv[++i]); //1;
 
       if(strcmp(argv[i],"-v")==0)
         verbose=1;
+      
+      if(strcmp(argv[i],"-b")==0)
+        forensic=1;
       
       i++;
     }
 
     //check parameter values
-    if(k<=0)
-      k=PAR_DEFAULT_K;
-    if(sigma<0)
-      sigma=PAR_DEFAULT_SIGMA;
-    if(radius<1)
-      radius=PAR_DEFAULT_RADIUS;
-    if(percentage<0 || percentage>1)
-      percentage=PAR_DEFAULT_PERCENTAGE;
+    if (k<=0)        k       = PAR_DEFAULT_K;
+    if (sigma_i<0)   sigma_i = PAR_DEFAULT_SIGMA_I;
+    if (sigma_n<0)   sigma_n = PAR_DEFAULT_SIGMA_N;
+    if (radius<1)    radius  = PAR_DEFAULT_RADIUS;
+    
+    if (nobel_measure<0 || nobel_measure>2) nobel_measure = PAR_DEFAULT_NOBEL_MEASURE;
+    if (percentage<0 || percentage>1)       percentage    = PAR_DEFAULT_PERCENTAGE;
   }
 
   return 1;
@@ -141,8 +157,8 @@ int read_parameters(
 
 void draw_points(
   float *I, 
-  vector<int> &x, 
-  vector<int> &y, 
+  std::vector<int> &x, 
+  std::vector<int> &y, 
   int nx, 
   int nz,
   int radius
@@ -202,13 +218,14 @@ int main(int argc, char *argv[])
 {
   //parameters of the method
   char  *image, *out_image=NULL, *out_file=NULL;
-  float k, sigma, percentage;
-  int   radius, nobel_measure, verbose;
+  float k, sigma_i, sigma_n, percentage;
+  int   radius, nobel_measure, verbose, forensic;
     
   //read the parameters from the console
   int result=read_parameters(
         argc, argv, &image, &out_image, &out_file, 
-	k, sigma, radius, percentage, nobel_measure, verbose
+        k, sigma_i, sigma_n, radius, percentage, 
+        nobel_measure, verbose, forensic
       );
   
   if(result)
@@ -218,18 +235,18 @@ int main(int argc, char *argv[])
     
     if(verbose)
       printf(
-	"Parameters:\n"
+        "Parameters:\n"
         "  Input image: '%s', Output image: '%s', Output corner file: %s\n"
-        "  K: %f, Sigma: %f, Window radius: %d, Percentage: %f\n"
-	"  Nobel's measure: %d, nx: %d, ny: %d, nz: %d\n",
-        image, out_image, out_file, k, sigma, radius, percentage,
-	nobel_measure, nx, ny, nz
+        "  K: %f, Sigma_i: %f, Sigma_n: %f, Window radius: %d, Percentage: %f\n"
+        "  Nobel's measure: %d, nx: %d, ny: %d, nz: %d\n",
+        image, out_image, out_file, k, sigma_i, sigma_n, radius, percentage,
+        nobel_measure, nx, ny, nz
       );
     
     
     if (Ic!=NULL)
     {
-      vector<int> x,y;
+      std::vector<int> x,y;
       float *I=new float[nx*ny];
       
       if(nz>1)
@@ -240,16 +257,16 @@ int main(int argc, char *argv[])
 
       struct timeval start, end;
 
-      //if(verbose) 
+      if (verbose) 
         gettimeofday(&start, NULL);
 
       //compute Harris' corners
       harris(
-	I, x, y, k, sigma, radius, percentage, 
-	nobel_measure, nx, ny, verbose
+             I, x, y, k, sigma_i, sigma_n, radius, percentage, 
+             nobel_measure, nx, ny, verbose, forensic
       );
       
-      //if(verbose) 
+      if (verbose) 
       {
         gettimeofday(&end, NULL);
         float delay=((end.tv_sec-start.tv_sec)* 1000000u + 
