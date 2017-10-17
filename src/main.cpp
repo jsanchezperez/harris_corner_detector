@@ -74,7 +74,7 @@ int read_parameters(
   int   &radius,
   float &percentage,
   int   &nobel_measure,
-  float &noise_threshold,  
+//  float &noise_threshold,  
   int   &verbose,
   int   &forensic 
 )
