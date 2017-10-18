@@ -14,13 +14,19 @@ obj:
 obj/iio.o: src/iio.c src/iio.h
 	$(CC) -c $< -o $@ -std=c99 $(CFLAGS) -Wno-unused -pedantic -DNDEBUG -D_GNU_SOURCE 
 
+obj/gradient.o: src/gradient.cpp src/gradient.h
+	$(CC) -c $< -o $@ -std=c++11 $(CFLAGS) -Wno-unused -pedantic -DNDEBUG -D_GNU_SOURCE 
+
+obj/gaussian.o: src/gaussian.cpp src/gaussian.h
+	$(CC) -c $< -o $@ -std=c++11 $(CFLAGS) -Wno-unused -pedantic -DNDEBUG -D_GNU_SOURCE 
+
 obj/harris.o: src/harris.cpp
 	$(CXX) -c $< -o $@ -std=c++11 $(CFLAGS) -Wno-unused -pedantic -DNDEBUG -D_GNU_SOURCE 
 
 
 	
 # ------- Main -------
-bin/harris_corner_detector: src/main.cpp obj/harris.o obj/iio.o
+bin/harris_corner_detector: src/main.cpp obj/harris.o obj/iio.o obj/gradient.o obj/gaussian.o
 	$(CXX) -std=c++11 -o $@ $^ $(CFLAGS) $(LFLAGS)
 
 	
