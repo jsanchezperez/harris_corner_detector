@@ -102,47 +102,43 @@ void spiral_order(
   int ny
 )
 {
-  int size=(2*radius+1)*(2*radius+1)-2*radius+1
+  int size=(2*radius+1)*(2*radius+1)-2*radius+1;
   
   int x=1, y=1;    //initial position
   int dx=-1, dy=0; //iterative increment
   int c=2;         //number of positions per branch
   int d=0;         //directions: 0-left; 1-up; 2-right; 3-down
   
-  int i=0
+  int i=0;
   index[i]=y*nx+x;
 
   while(i<size)
   {
-    for(int j=0; j<c; j++)
+    for(int j=0; j<c && i<size; j++)
     {
       x+=dx; y+=dy;
       if(x!=0) //do not include the current line in the index
       {
         index[i]=y*nx+x;
+	printf("%d, ", index[i]);
         i++;
       }
     }
-    
-    //start with the following branch
-    if(d==2) 
-    {
-      x+=dx; y+=dy;
-      index[i]=y*nx+x;
-    }
-    
+        
     //change direction
     d=(d+1)%4;
     switch(d)
     {
-      case 1: dx=-1; dy=0;  break;
-      case 2: dx=0;  dy=-1; break;
-      case 3: dx=1;  dy=0;  break;
-      case 4: dx=0;  dy=1;  break;  
+      case 0: dx=-1; dy=0;  break;
+      case 1: dx=0;  dy=-1; break;
+      case 2: dx=1;  dy=0;  break;
+      case 3: dx=0;  dy=1;  break;  
     }
     
-    //increase the number of cells to traverse
-    c++; 
+    //increase traverse
+    if(d==0 || d==2) 
+      c++;
+
   }
 }
 
@@ -157,18 +153,21 @@ void non_maximum_suppression(
   int   radius,        // window radius
   int   nx,            // number of columns of the image
   int   ny,            // number of rows of the image
-  int   verbose,       // activate verbose mode
-  int   forensics      // activate forensics mode  
+  int   verbose        // activate verbose mode
 )
 {
   int *mask     = new int[nx*ny];
   int *scanline = new int[nx];
   int *skip     = new int[nx];
+  int *index    = new int[(2*radius+1)*(2*radius+1)-2*radius+1];
   
+  spiral_order(index, radius, nx, ny);
+
   
   delete []mask;
   delete []scanline;
   delete []skip;
+  delete []index;
 }
 
 
@@ -317,6 +316,9 @@ void harris(
   }
   
   int *local_max = new int[nx*ny]();
+  non_maximum_suppression(Mc, radius, nx, ny, verbose );
+  
+  
   for (int i=radius+1;i<ny-radius-1;i++)
     for (int j=radius+1;j<nx-radius-1;j++)
         if(
