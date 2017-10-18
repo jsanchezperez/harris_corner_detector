@@ -93,37 +93,41 @@ void shi_tomasi_measure(
 /**
   *
   * Function for computing the spiral order indexes
+  * for non-maximum_suppression
   *
 **/
 void spiral_order(
   int *index,
   int radius,
-  int nx,
-  int ny
+  int nx
 )
 {
-  int size=(2*radius+1)*(2*radius+1)-2*radius+1;
+  int size=(2*radius+1)*(2*radius+1)-2*radius-1;
   
   int x=1, y=1;    //initial position
   int dx=-1, dy=0; //iterative increment
   int c=2;         //number of positions per branch
   int d=0;         //directions: 0-left; 1-up; 2-right; 3-down
   
-  int i=0;
-  index[i]=y*nx+x;
-
+  //the first position is the botton-right corner
+  index[0]=y*nx+x;
+  
+  int i=1;
   while(i<size)
   {
+    //process following line
     for(int j=0; j<c && i<size; j++)
     {
+      //next position in the line
       x+=dx; y+=dy;
-      if(x!=0) //do not include the current line in the index
+      
+      //do not include the central line in the index
+      if(y!=0) 
       {
         index[i]=y*nx+x;
-	printf("%d, ", index[i]);
         i++;
       }
-    }
+    }    
         
     //change direction
     d=(d+1)%4;
@@ -138,7 +142,6 @@ void spiral_order(
     //increase traverse
     if(d==0 || d==2) 
       c++;
-
   }
 }
 
@@ -149,23 +152,80 @@ void spiral_order(
   *
 **/
 void non_maximum_suppression(
-  float *I,            // input image
-  int   radius,        // window radius
-  int   nx,            // number of columns of the image
-  int   ny,            // number of rows of the image
-  int   verbose        // activate verbose mode
+  float *I,             // input image
+  std::vector<int> &x,  // x position of maxima
+  std::vector<int> &y,  // y position of maxima
+  int   radius,         // window radius
+  int   nx,             // number of columns of the image
+  int   ny,             // number of rows of the image
+  int   verbose         // activate verbose mode
 )
 {
-  int *mask     = new int[nx*ny];
-  int *scanline = new int[nx];
-  int *skip     = new int[nx];
-  int *index    = new int[(2*radius+1)*(2*radius+1)-2*radius+1];
-  
-  spiral_order(index, radius, nx, ny);
+  int *skip  = new int[nx*ny]();
+  int size   = (2*radius+1)*(2*radius+1)-2*radius-1;
+  int *index = new int[size];
 
+  //create the spiral order index
+  spiral_order(index, radius, nx);
+
+  for(int i=radius; i<ny-radius; i++)
+  {
+    int j=radius;
+    
+    //avoid the downhill at the beginning
+    while(I[i*nx+j-1]>=I[i*nx+j] && j<nx-radius) j++;
+      
+    while(j<nx-radius)
+    {
+      //find the next peak 
+      while((skip[i*nx+j] || I[i*nx+j+1]>=I[i*nx+j]) && j<nx-radius)
+	j++;
+      
+      if(j<nx-radius)
+      {
+	int p1=j+2;
+
+	//find a bigger value on the right
+	while(I[i*nx+p1]<I[i*nx+j] && p1<=j+radius) 
+	{
+	  skip[i*nx+p1]=1;
+	  p1++;
+	}
+	
+	if(p1>j+radius)
+	{  
+	  int p2=j-1;
+	  
+	  //find a bigger value on the left
+	  while(I[i*nx+p2]<=I[i*nx+j] && p2>=j-radius)
+	    p2--;
+	  
+	  if(p2<j-radius)
+	  {
+	    //spiral order test
+	    int s=0;
+	    while(s<size && I[i*nx+j+index[s]]<I[i*nx+j])
+	    {
+	      if(i*nx+j+index[s]>i*nx+j)
+		skip[i*nx+index[s]]=1;
+	      s++;	       
+	    }
+
+	    //if we found a local maximum add to the list
+	    if(s>=size) 
+	    {
+	      x.push_back(j);
+	      y.push_back(i);
+	      //printf("%d %d\n", x.back(), y.back());
+	    }
+	  }
+	  j++;
+	}
+	else j=p1;
+      }
+    }
+  }
   
-  delete []mask;
-  delete []scanline;
   delete []skip;
   delete []index;
 }
@@ -315,20 +375,11 @@ void harris(
      gettimeofday(&start, NULL);     
   }
   
-  int *local_max = new int[nx*ny]();
-  non_maximum_suppression(Mc, radius, nx, ny, verbose );
   
+  x.reserve(1000);
+  y.reserve(1000);
+  non_maximum_suppression(Mc, x, y, radius, nx, ny, verbose);
   
-  for (int i=radius+1;i<ny-radius-1;i++)
-    for (int j=radius+1;j<nx-radius-1;j++)
-        if(
-	Mc[i*nx+j]>Mc[(i-1)*nx+j-1] && Mc[i*nx+j]>Mc[(i-1)*nx+j] &&
-	Mc[i*nx+j]>Mc[(i-1)*nx+j+1] && Mc[i*nx+j]>Mc[i*nx+j-1]   &&
-	Mc[i*nx+j]>Mc[i*nx+j+1] && Mc[i*nx+j]>Mc[(i+1)*nx+j-1]   &&
-	Mc[i*nx+j]>Mc[(i+1)*nx+j] && Mc[i*nx+j]>Mc[(i+1)*nx+j+1] &&
-	Mc[i*nx+j]>0
-      )
-	local_max[i*nx+j]=1;
 
   
   if (verbose) 
@@ -349,7 +400,7 @@ void harris(
      gettimeofday(&start, NULL);
   }
 
-  x.reserve(1000);
+/*  x.reserve(1000);
   y.reserve(1000);
   for(int i=radius+1;i<ny-radius-1;i++)
     for(int j=radius+1;j<nx-radius-1;j++)
@@ -358,7 +409,7 @@ void harris(
         x.push_back(j);
         y.push_back(i);
       }
-
+*/
   if (verbose)
   {      
      gettimeofday(&end, NULL);
@@ -376,12 +427,11 @@ void harris(
     iio_save_image_float_vec(name, Mc, nx, ny, 1);
 
     printf("  -Saving selected_Mc.png \n");
-    for(int i=0;i<nx*ny;i++) if(local_max[i]==0) Mc[i]=0; 
+    //for(int i=0;i<nx*ny;i++) if(local_max[i]==0) Mc[i]=0; 
     char name1[200]="selected_Mc.png";
     iio_save_image_float_vec(name1, Mc, nx, ny, 1);
   }
   
-  delete []local_max;
   delete []Mc;
   delete []Ix;
   delete []Iy;
