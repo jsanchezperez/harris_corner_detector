@@ -89,7 +89,6 @@ void shi_tomasi_measure(
 
 
 
-
 /**
   *
   * Function for computing the spiral order indexes
@@ -99,7 +98,8 @@ void shi_tomasi_measure(
 void spiral_order(
   int *index,
   int radius,
-  int nx
+  int nx,
+  int bruteforce=0
 )
 {
   int size=(2*radius+1)*(2*radius+1)-2*radius-1;
@@ -122,7 +122,7 @@ void spiral_order(
       x+=dx; y+=dy;
       
       //do not include the central line in the index
-      if(y!=0) 
+      if(y!=0 || bruteforce) 
       {
         index[i]=y*nx+x;
         i++;
@@ -146,6 +146,8 @@ void spiral_order(
 }
 
 
+#define BRUTEFORCE
+
 /**
   *
   * Function for non-maximum suppression
@@ -161,6 +163,38 @@ void non_maximum_suppression(
   int   verbose         // activate verbose mode
 )
 {
+
+#ifdef BRUTEFORCE
+  
+  for(int i=radius; i<ny-radius; i++)
+  {
+    for(int j=radius; j<nx-radius; j++)
+    {
+      int k=i-radius; 
+      bool found=false;
+      while(!found && k<=i+radius)
+      {
+        int l=j-radius;
+        while(!found && l<=j+radius)
+        {
+          if(I[k*nx+l]>I[i*nx+j])
+            found=true;
+          l++;
+        }
+        k++;
+      }
+      
+      //if we found a local maximum add to the list
+      if(!found) 
+      {
+        x.push_back(j);
+        y.push_back(i);
+      }
+    }
+  }
+
+#else
+
   int *skip  = new int[nx*ny]();
   int size   = (2*radius+1)*(2*radius+1)-2*radius-1;
   int *index = new int[size];
@@ -168,6 +202,7 @@ void non_maximum_suppression(
   //create the spiral order index
   spiral_order(index, radius, nx);
 
+//#pragma omp parallel for
   for(int i=radius; i<ny-radius; i++)
   {
     int j=radius;
@@ -179,55 +214,56 @@ void non_maximum_suppression(
     {
       //find the next peak 
       while((skip[i*nx+j] || I[i*nx+j+1]>=I[i*nx+j]) && j<nx-radius)
-	j++;
+        j++;
       
       if(j<nx-radius)
       {
-	int p1=j+2;
+        int p1=j+2;
 
-	//find a bigger value on the right
-	while(I[i*nx+p1]<I[i*nx+j] && p1<=j+radius) 
-	{
-	  skip[i*nx+p1]=1;
-	  p1++;
-	}
-	
-	if(p1>j+radius)
-	{  
-	  int p2=j-1;
-	  
-	  //find a bigger value on the left
-	  while(I[i*nx+p2]<=I[i*nx+j] && p2>=j-radius)
-	    p2--;
-	  
-	  if(p2<j-radius)
-	  {
-	    //spiral order test
-	    int s=0;
-	    while(s<size && I[i*nx+j+index[s]]<I[i*nx+j])
-	    {
-	      if(i*nx+j+index[s]>i*nx+j)
-		skip[i*nx+index[s]]=1;
-	      s++;	       
-	    }
+        //find a bigger value on the right
+        while(I[i*nx+p1]<I[i*nx+j] && p1<=j+radius) 
+        {
+          skip[i*nx+p1]=1;
+          p1++;
+        }
 
-	    //if we found a local maximum add to the list
-	    if(s>=size) 
-	    {
-	      x.push_back(j);
-	      y.push_back(i);
-	      //printf("%d %d\n", x.back(), y.back());
-	    }
-	  }
-	  j++;
-	}
-	else j=p1;
+        if(p1>j+radius)
+        {  
+          int p2=j-1;
+  
+          //find a bigger value on the left
+          while(I[i*nx+p2]<=I[i*nx+j] && p2>=j-radius)
+            p2--;
+  
+          if(p2<j-radius)
+          {
+            //spiral order test
+            int s=0;
+            while(s<size && I[i*nx+j+index[s]]<I[i*nx+j])
+            {
+              //if(i*nx+j+index[s]>i*nx+j)
+              skip[i*nx+j+index[s]]=1;
+              s++;	       
+            }
+
+            //new local maximum found
+            if(s>=size) 
+            {
+              x.push_back(j);
+              y.push_back(i);
+            }
+          }
+          j++;
+        }
+        else j=p1;
       }
     }
   }
   
   delete []skip;
   delete []index;
+
+#endif
 }
 
 
@@ -371,7 +407,7 @@ void harris(
   // Non-maximum suppression
   if (verbose) 
   {
-     printf(" 4.Non-maximum suppression\n");
+     printf("\n 4.Non-maximum suppression\n");
      gettimeofday(&start, NULL);     
   }
   
@@ -385,7 +421,7 @@ void harris(
   if (verbose) 
   {
      gettimeofday(&end, NULL);
-     printf("\n Time: %fs\n", ((end.tv_sec-start.tv_sec)* 1000000u + 
+     printf("Time: %fs\n", ((end.tv_sec-start.tv_sec)* 1000000u + 
             end.tv_usec - start.tv_usec) / 1.e6);
   }
 
@@ -393,7 +429,7 @@ void harris(
   if (verbose)
   {
      printf(
-        " 5.Selecting corner points by non-maximum suppression "
+        "\n 5.Selecting corner points by non-maximum suppression "
         "and %f of maximum\n", percentage
      );
   
