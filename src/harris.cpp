@@ -146,7 +146,8 @@ void spiral_order(
 }
 
 
-#define BRUTEFORCE
+//#define BRUTEFORCE
+#define SPIRAL_TEST
 
 /**
   *
@@ -237,6 +238,7 @@ void non_maximum_suppression(
   
           if(p2<j-radius)
           {
+#ifdef SPIRAL_TEST
             //spiral order test
             int s=0;
             while(s<size && I[i*nx+j+index[s]]<I[i*nx+j])
@@ -252,7 +254,43 @@ void non_maximum_suppression(
               x.push_back(j);
               y.push_back(i);
             }
-          }
+#else
+            int k=i+radius; 
+            bool found=false;
+            while(!found && k>i)
+            {
+              int l=j+radius;
+              while(!found && l>=j-radius)
+              {
+                if(I[k*nx+l]>I[i*nx+j])
+                  found=true;
+                else skip[k*nx+l]=1;
+                l--;
+              }
+              k--;
+            }
+            
+            k=i-radius; 
+            while(!found && k<i)
+            {
+              int l=j-radius;
+              while(!found && l<=j-radius)
+              {
+                if(I[k*nx+l]>=I[i*nx+j])
+                  found=true;
+                else skip[k*nx+l]=1;
+                l++;
+              }
+              k++;
+            }
+            
+            if(!found) 
+            {
+              x.push_back(j);
+              y.push_back(i);
+            }
+#endif
+	  }
           j++;
         }
         else j=p1;
