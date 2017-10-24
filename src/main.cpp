@@ -17,6 +17,7 @@ extern "C"
 #define PAR_DEFAULT_PERCENTAGE 0.1
 #define PAR_DEFAULT_RADIUS 5
 #define PAR_DEFAULT_NOBEL_MEASURE 0
+#define PAR_DEFAULT_SUBPIXEL_PRECISION 0
 #define PAR_DEFAULT_VERBOSE 0
 #define PAR_DEFAULT_FORENSIC 0
 
@@ -41,7 +42,7 @@ void print_help(char *name)
   printf("   -f name  write points to file\n");
   printf("   -k N     Harris' K parameter\n");
   printf("              default value %f\n", PAR_DEFAULT_K);
-  printf("   -i N     Gauss standard deviation for image denoised\n");
+  printf("   -i N     Gauss standard deviation for image denoising\n");
   printf("              default value %f\n", PAR_DEFAULT_SIGMA_I);    
   printf("   -s N     Gauss standard deviation for weighted windows\n");
   printf("              default value %f\n", PAR_DEFAULT_SIGMA_N);
@@ -49,8 +50,8 @@ void print_help(char *name)
   printf("              default value %d\n", PAR_DEFAULT_RADIUS);
   printf("   -p N     percentage with respect to the maximum for selecting points\n");
   printf("              default value %f\n", PAR_DEFAULT_PERCENTAGE);
-  printf("   -n       use Nobel's measure: 0=Harris; 1=Shid-Tomasi; 2=Zseliski; ...\n"); 
-                       //(does not need parameter K) \n");
+  printf("   -n       use Nobel's measure: 0=Harris; 1=Shid-Tomasi; 2=Zseliski\n"); 
+  printf("   -q       subpixel precision through quadratic interpolation\n"); 
   printf("   -v       switch on verbose mode \n");
   printf("   -b       switch on forensic mode \n\n\n");  
 }
@@ -74,7 +75,7 @@ int read_parameters(
   int   &radius,
   float &percentage,
   int   &nobel_measure,
-//  float &noise_threshold,  
+  int   &subpixel_precision,  
   int   &verbose,
   int   &forensic 
 )
@@ -96,6 +97,7 @@ int read_parameters(
     forensic=PAR_DEFAULT_FORENSIC;
     percentage=PAR_DEFAULT_PERCENTAGE;
     nobel_measure=PAR_DEFAULT_NOBEL_MEASURE;
+    subpixel_precision=PAR_DEFAULT_SUBPIXEL_PRECISION;
     
     //read each parameter from the command line
     while(i<argc)
@@ -131,6 +133,9 @@ int read_parameters(
       if(strcmp(argv[i],"-n")==0)
         nobel_measure=atoi(argv[++i]); //1;
 
+      if(strcmp(argv[i],"-q")==0)
+        subpixel_precision=1;
+
       if(strcmp(argv[i],"-v")==0)
         verbose=1;
       
@@ -157,8 +162,8 @@ int read_parameters(
 
 void draw_points(
   float *I, 
-  std::vector<int> &x, 
-  std::vector<int> &y, 
+  std::vector<float> &x, 
+  std::vector<float> &y, 
   int nx, 
   int nz,
   int radius
@@ -170,25 +175,25 @@ void draw_points(
     {
       for(int j=x[i]-radius;j<=x[i]+radius;j++)
       {
-	I[(y[i]*nx+j)*nz]=0;
-	I[(y[i]*nx+j)*nz+1]=0;
-	I[(y[i]*nx+j)*nz+2]=255;
+	I[((int)y[i]*nx+j)*nz]=0;
+	I[((int)y[i]*nx+j)*nz+1]=0;
+	I[((int)y[i]*nx+j)*nz+2]=255;
       }
       
       for(int j=y[i]-radius;j<=y[i]+radius;j++)
       {
-	I[(j*nx+x[i])*nz]=0;
-	I[(j*nx+x[i])*nz+1]=0;
-	I[(j*nx+x[i])*nz+2]=255;
+	I[(j*nx+(int)x[i])*nz]=0;
+	I[(j*nx+(int)x[i])*nz+1]=0;
+	I[(j*nx+(int)x[i])*nz+2]=255;
       }
     }
   else
     for(unsigned int i=0;i<x.size();i++)
     {
       for(int j=x[i]-radius;j<=x[i]+radius;j++)
-	I[y[i]*nx+j]=255;
+	I[(int)y[i]*nx+j]=255;
       for(int j=y[i]-radius;j<=y[i]+radius;j++)
-	I[j*nx+x[i]]=255;
+	I[j*nx+(int)x[i]]=255;
     }
 }
 
@@ -219,13 +224,14 @@ int main(int argc, char *argv[])
   //parameters of the method
   char  *image, *out_image=NULL, *out_file=NULL;
   float k, sigma_i, sigma_n, percentage;
-  int   radius, nobel_measure, verbose, forensic;
+  int   radius, nobel_measure, subpixel_precision;
+  int   verbose, forensic;
     
   //read the parameters from the console
   int result=read_parameters(
         argc, argv, &image, &out_image, &out_file, 
         k, sigma_i, sigma_n, radius, percentage, 
-        nobel_measure, verbose, forensic
+        nobel_measure, subpixel_precision, verbose, forensic
       );
   
   if(result)
@@ -246,7 +252,7 @@ int main(int argc, char *argv[])
     
     if (Ic!=NULL)
     {
-      std::vector<int> x,y;
+      std::vector<float> x,y;
       float *I=new float[nx*ny];
       
       if(nz>1)
@@ -262,8 +268,8 @@ int main(int argc, char *argv[])
 
       //compute Harris' corners
       harris(
-             I, x, y, k, sigma_i, sigma_n, radius, percentage, 
-             nobel_measure, nx, ny, verbose, forensic
+        I, x, y, k, sigma_i, sigma_n, radius, percentage, 
+        nobel_measure, subpixel_precision, nx, ny, verbose, forensic
       );
       
       if (verbose) 
@@ -284,7 +290,7 @@ int main(int argc, char *argv[])
       {
 	FILE *fd=fopen(out_file,"w");
 	for(unsigned int i=0;i<x.size();i++)
-	  fprintf(fd, "%d %d\n", x[i],y[i]);
+	  fprintf(fd, "%f %f\n", x[i],y[i]);
 	fclose(fd);
       }
 

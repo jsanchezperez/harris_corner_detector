@@ -5,14 +5,15 @@
 
 void harris(
   float *I,
-  std::vector<int> &x,
-  std::vector<int> &y,
+  std::vector<float> &x,
+  std::vector<float> &y,
   float alpha,
   float sigma_i,
   float sigma_n,
   int   radius,
   float percentage,
   int   nobel_measure,
+  int   precision,
   int   nx,
   int   ny,
   int   verbose,

@@ -84,7 +84,7 @@ void shi_tomasi_measure(
   float th
 )
 {
-  printf("\n\n Shidtomasi_measure: not implemented yet !!! \n\n");
+  printf("\n\n Shi-tomasi_measure: not implemented yet !!! \n\n");
 }
 
 
@@ -147,7 +147,7 @@ void spiral_order(
 
 
 //#define BRUTEFORCE
-#define SPIRAL_TEST
+//#define SPIRAL_TEST
 
 /**
   *
@@ -156,8 +156,8 @@ void spiral_order(
 **/
 void non_maximum_suppression(
   float *I,             // input image
-  std::vector<int> &x,  // x position of maxima
-  std::vector<int> &y,  // y position of maxima
+  std::vector<float> &x,  // x position of maxima
+  std::vector<float> &y,  // y position of maxima
   int   radius,         // window radius
   int   nx,             // number of columns of the image
   int   ny,             // number of rows of the image
@@ -274,7 +274,7 @@ void non_maximum_suppression(
             while(!found && k<i)
             {
               int l=j-radius;
-              while(!found && l<=j-radius)
+              while(!found && l<=j+radius)
               {
                 if(I[k*nx+l]>=I[i*nx+j])
                   found=true;
@@ -307,19 +307,43 @@ void non_maximum_suppression(
 
 /**
   *
+  * Function for computing subpixel precision of maxima
+  *
+**/
+void subpixel_precision(
+  float *Mc,             // discriminant function
+  std::vector<float> &x, // selected points (x coordinates)
+  std::vector<float> &y  // selected points (y coordinates)
+)
+{
+  /*for(int i=0; i<x.size(); i++)
+  {
+    float M[9];
+    M[0]=
+    //calculate the maximum of the quadratic interpolation
+    maximum_interpolation(float *M, float x[i], float y[i])
+  }*/
+    
+}
+
+  
+  
+/**
+  *
   * Function for computing Harris corners
   *
 **/
 void harris(
   float *I,            // input image
-  std::vector<int> &x, // output selected points (x coordinates)
-  std::vector<int> &y, // output selected points (y coordinates)
+  std::vector<float> &x, // output selected points (x coordinates)
+  std::vector<float> &y, // output selected points (y coordinates)
   float k,             // Harris constant for the ....function
   float sigma_i,       // standard deviation for smoothing (image denoising)    
   float sigma_n,       // standard deviation for smoothing (pixel neighbourhood)
   int   radius,        // radius of the autocorralation matrix
   float percentage,    
   int   nobel_measure,
+  int   precision,
   int   nx,            // number of columns of the image
   int   ny,            // number of rows of the image
   int   verbose,       // activate verbose mode
@@ -407,20 +431,21 @@ void harris(
   gaussian(B, nx, ny, sigma_n);
   gaussian(C, nx, ny, sigma_n);
   
-  
   if (verbose) 
   {  
      gettimeofday(&end, NULL);
      printf("\n Time: %fs\n", ((end.tv_sec-start.tv_sec)* 1000000u + 
             end.tv_usec - start.tv_usec) / 1.e6);
      
-     gettimeofday(&start, NULL);     
+     
+    printf(" 4.Computing one of the measures (0.Harris, 1.Shi-Tomasi, 2.Szeliski): %d\n", nobel_measure);
+    gettimeofday(&start, NULL);     
   }
-
 
   float max = FLT_MIN;
   float min = FLT_MAX;
   
+  //compute the discriminant function following one strategy
   if (nobel_measure == 0)
      harris_measure( A, B, C, Mc, nx, ny, k, max, min );
 
@@ -431,11 +456,10 @@ void harris(
      zseliski_measure( A, B, C, Mc, nx, ny, max, min );
 
   
-  
   if (verbose) 
   {  
      gettimeofday(&end, NULL);
-     printf("\n Time: %fs\n", ((end.tv_sec-start.tv_sec)* 1000000u + 
+     printf("Time: %fs\n", ((end.tv_sec-start.tv_sec)* 1000000u + 
             end.tv_usec - start.tv_usec) / 1.e6);
      
      printf("  -Mc max=%f, Mc min=%f\n",max, min);     
@@ -445,16 +469,14 @@ void harris(
   // Non-maximum suppression
   if (verbose) 
   {
-     printf("\n 4.Non-maximum suppression\n");
+     printf("\n 5.Non-maximum suppression\n");
      gettimeofday(&start, NULL);     
   }
-  
   
   x.reserve(1000);
   y.reserve(1000);
   non_maximum_suppression(Mc, x, y, radius, nx, ny, verbose);
   
-
   
   if (verbose) 
   {
@@ -463,34 +485,29 @@ void harris(
             end.tv_usec - start.tv_usec) / 1.e6);
   }
 
-  //select the points depending on a percentage of the maximum and local maxima
-  if (verbose)
-  {
-     printf(
-        "\n 5.Selecting corner points by non-maximum suppression "
-        "and %f of maximum\n", percentage
-     );
+
+  //AQUI VA EL CODIGO PARA SELECCIONAR LOS PUNTOS (sort, ...)
   
-     gettimeofday(&start, NULL);
-  }
-
-/*  x.reserve(1000);
-  y.reserve(1000);
-  for(int i=radius+1;i<ny-radius-1;i++)
-    for(int j=radius+1;j<nx-radius-1;j++)
-      if(local_max[i*nx+j] && Mc[i*nx+j]>max*percentage)
-      {
-        x.push_back(j);
-        y.push_back(i);
-      }
-*/
-  if (verbose)
-  {      
-     gettimeofday(&end, NULL);
-     printf("\n Time: %fs\n", ((end.tv_sec-start.tv_sec)* 1000000u + 
+ 
+  //compute subpixel precision through quadratic interpolation
+  if(precision)
+  {
+    if (verbose)
+    {
+       printf("\n 6.Computing subpixel precision\n");
+       gettimeofday(&start, NULL);
+    }
+    
+    subpixel_precision(Mc, x, y);
+    
+    if (verbose)
+    {      
+       gettimeofday(&end, NULL);
+       printf("Time: %fs\n", ((end.tv_sec-start.tv_sec)* 1000000u + 
             end.tv_usec - start.tv_usec) / 1.e6);
+    }    
+    
   }
-
       
   if(forensics)
   {
