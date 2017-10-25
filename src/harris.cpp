@@ -11,6 +11,7 @@ extern "C"
 #include "harris.h"
 #include "gradient.h"
 #include "gaussian.h"
+#include "interpolation.h"
 
 
 // ........................
@@ -313,20 +314,37 @@ void non_maximum_suppression(
 void subpixel_precision(
   float *Mc,             // discriminant function
   std::vector<float> &x, // selected points (x coordinates)
-  std::vector<float> &y  // selected points (y coordinates)
+  std::vector<float> &y, // selected points (y coordinates)
+  int nx
 )
 {
-  /*for(int i=0; i<x.size(); i++)
-  {
+  for(unsigned int i=0; i<x.size(); i++)
+  {    
+    int mx=x[i]-1;
+    int dx=x[i]+1;
+    int my=y[i]-1;
+    int dy=y[i]+1;
+    
     float M[9];
-    M[0]=
+    M[0]=Mc[my*nx+mx];
+    M[1]=Mc[my*nx+(int)x[i]];
+    M[2]=Mc[my*nx+dx];
+    M[3]=Mc[(int)y[i]*nx+mx];
+    M[4]=Mc[(int)y[i]*nx+(int)x[i]];
+    M[5]=Mc[(int)y[i]*nx+dx];
+    M[6]=Mc[dy*nx+mx];
+    M[7]=Mc[dy*nx+(int)x[i]];
+    M[8]=Mc[dy*nx+dx];
+
+    //printf(" Subpixel precision (%f, %f) => ",x[i],y[i]);
     //calculate the maximum of the quadratic interpolation
-    maximum_interpolation(float *M, float x[i], float y[i])
-  }*/
+    maximum_interpolation(M, x[i], y[i]);
+    //printf("(%f, %f)\n",x[i],y[i]);
+  }
     
 }
+    
 
-  
   
 /**
   *
@@ -498,7 +516,7 @@ void harris(
        gettimeofday(&start, NULL);
     }
     
-    subpixel_precision(Mc, x, y);
+    subpixel_precision(Mc, x, y, nx);
     
     if (verbose)
     {      
