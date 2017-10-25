@@ -14,8 +14,6 @@ extern "C"
 #include "interpolation.h"
 
 
-// ........................
-
 /**
   *
   * Function for computing Harris's corner measure
@@ -42,7 +40,6 @@ void harris_measure(
       if (Mc[i] < min)  min = Mc[i];
   }
 }
-
 
 
 /**
@@ -404,8 +401,7 @@ void harris(
   }
   
   gradient(I, Ix, Iy, nx, ny);
-  
-  
+
   if (verbose) 
   {  
      gettimeofday(&end, NULL);
@@ -416,7 +412,7 @@ void harris(
   if (forensics)
   {
      printf("  -Saving Is.png, Ix.png, Iy.png\n");
-  
+
      char name1[200]="Is.png";
      char name2[200]="Ix.png";
      char name3[200]="Iy.png";
@@ -424,7 +420,7 @@ void harris(
      iio_save_image_float_vec(name2, Ix, nx, ny, 1);
      iio_save_image_float_vec(name3, Iy, nx, ny, 1);
   }
-  
+
   //compute the Harris function in each pixel
   if (verbose) 
   {
@@ -432,7 +428,7 @@ void harris(
 
      gettimeofday(&start, NULL);
   }
-  
+
   float *A = new float[size];
   float *B = new float[size];
   float *C = new float[size];
@@ -444,25 +440,24 @@ void harris(
      B[i] = Ix[i]*Iy[i];
      C[i] = Iy[i]*Iy[i];
   }
-  
+
   gaussian(A, nx, ny, sigma_n);
   gaussian(B, nx, ny, sigma_n);
   gaussian(C, nx, ny, sigma_n);
-  
+
   if (verbose) 
   {  
      gettimeofday(&end, NULL);
      printf("\n Time: %fs\n", ((end.tv_sec-start.tv_sec)* 1000000u + 
             end.tv_usec - start.tv_usec) / 1.e6);
-     
-     
+
     printf(" 4.Computing one of the measures (0.Harris, 1.Shi-Tomasi, 2.Szeliski): %d\n", nobel_measure);
     gettimeofday(&start, NULL);     
   }
 
   float max = FLT_MIN;
   float min = FLT_MAX;
-  
+
   //compute the discriminant function following one strategy
   if (nobel_measure == 0)
      harris_measure( A, B, C, Mc, nx, ny, k, max, min );
@@ -473,7 +468,7 @@ void harris(
   if (nobel_measure == 2)
      zseliski_measure( A, B, C, Mc, nx, ny, max, min );
 
-  
+
   if (verbose) 
   {  
      gettimeofday(&end, NULL);
@@ -490,12 +485,12 @@ void harris(
      printf("\n 5.Non-maximum suppression\n");
      gettimeofday(&start, NULL);     
   }
-  
+
   x.reserve(1000);
   y.reserve(1000);
   non_maximum_suppression(Mc, x, y, radius, nx, ny, verbose);
-  
-  
+
+
   if (verbose) 
   {
      gettimeofday(&end, NULL);
@@ -505,8 +500,7 @@ void harris(
 
 
   //AQUI VA EL CODIGO PARA SELECCIONAR LOS PUNTOS (sort, ...)
-  
- 
+
   //compute subpixel precision through quadratic interpolation
   if(precision)
   {
@@ -515,16 +509,15 @@ void harris(
        printf("\n 6.Computing subpixel precision\n");
        gettimeofday(&start, NULL);
     }
-    
+
     subpixel_precision(Mc, x, y, nx);
-    
+
     if (verbose)
     {      
        gettimeofday(&end, NULL);
        printf("Time: %fs\n", ((end.tv_sec-start.tv_sec)* 1000000u + 
             end.tv_usec - start.tv_usec) / 1.e6);
-    }    
-    
+    }
   }
       
   if(forensics)
