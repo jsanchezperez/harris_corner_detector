@@ -3,6 +3,8 @@
 #define MAX_ITERATIONS 100
 
 
+#include "harris.h"
+
 #include <stdio.h>
 
 /**
@@ -117,8 +119,7 @@ bool solve(
 **/
 bool maximum_interpolation(
   float *M, //values of the surfare (9 values)
-  float &x, //x solution
-  float &y, //y solution
+  harris_corner &corner, //corner
   float TOL //stopping criterion threshold
 )
 {
@@ -153,7 +154,9 @@ bool maximum_interpolation(
     return false;
   else
   {
-    x+=dx; y+=dy;
+    //compute the new position and value
+    corner.x+=dx; corner.y+=dy;
+    corner.Mc=f(a, corner.x, corner.y);
     return true;
   }
 }
@@ -188,4 +191,3 @@ float G(float x, float y)
      printf("Resultado = %f, %f \n",x,y);
 
 }*/
-

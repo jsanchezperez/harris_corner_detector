@@ -2,6 +2,7 @@
 #include <math.h>
 #include <float.h>
 #include <sys/time.h> 
+#include <algorithm>
 
 extern "C"
 {
@@ -15,6 +16,20 @@ extern "C"
 
 
 using namespace std;
+
+
+
+/**
+  *
+  * Overload less function to compare two corners
+  *
+**/
+bool operator<(
+  const harris_corner &c1, 
+  const harris_corner &c2
+) {
+  return c1.Mc > c2.Mc;
+}
 
 
 /**
@@ -176,8 +191,7 @@ void spiral_order(
 **/
 void non_maximum_suppression(
   float *I,             // input image
-  vector<float> &x,  // x position of maxima
-  vector<float> &y,  // y position of maxima
+  vector<harris_corner> &corners,  // Harris' corners
   int   radius,         // window radius
   int   nx,             // number of columns of the image
   int   ny,             // number of rows of the image
@@ -207,10 +221,7 @@ void non_maximum_suppression(
       
       //if we found a local maximum add to the list
       if(!found) 
-      {
-        x.push_back(j);
-        y.push_back(i);
-      }
+        corners.push_back({(float)j,(float)i,I[i*nx+j]});
     }
   }
 
@@ -270,10 +281,7 @@ void non_maximum_suppression(
 
             //new local maximum found
             if(s>=size) 
-            {
-              x.push_back(j);
-              y.push_back(i);
-            }
+              corners.push_back({(float)j,(float)i,I[i*nx+j]});
 #else
             int k=i+radius; 
             bool found=false;
@@ -305,10 +313,7 @@ void non_maximum_suppression(
             }
             
             if(!found) 
-            {
-              x.push_back(j);
-              y.push_back(i);
-            }
+              corners.push_back({(float)j,(float)i,I[i*nx+j]});
 #endif
 	  }
           j++;
@@ -332,38 +337,41 @@ void non_maximum_suppression(
 **/
 void subpixel_precision(
   float *Mc,             // discriminant function
-  vector<float> &x, // selected points (x coordinates)
-  vector<float> &y, // selected points (y coordinates)
+  vector<harris_corner> &corners, // selected corners
   int nx
 )
 {
-  for(unsigned int i=0; i<x.size(); i++)
-  {    
-    int mx=x[i]-1;
-    int dx=x[i]+1;
-    int my=y[i]-1;
-    int dy=y[i]+1;
+  for(unsigned int i=0; i<corners.size(); i++)
+  {
+    const float x=corners[i].x;
+    const float y=corners[i].y;
+   
+    int mx=x-1;
+    int dx=x+1;
+    int my=y-1;
+    int dy=y+1;
     
     float M[9];
     M[0]=Mc[my*nx+mx];
-    M[1]=Mc[my*nx+(int)x[i]];
+    M[1]=Mc[my*nx+(int)x];
     M[2]=Mc[my*nx+dx];
-    M[3]=Mc[(int)y[i]*nx+mx];
-    M[4]=Mc[(int)y[i]*nx+(int)x[i]];
-    M[5]=Mc[(int)y[i]*nx+dx];
+    M[3]=Mc[(int)y*nx+mx];
+    M[4]=Mc[(int)y*nx+(int)x];
+    M[5]=Mc[(int)y*nx+dx];
     M[6]=Mc[dy*nx+mx];
-    M[7]=Mc[dy*nx+(int)x[i]];
+    M[7]=Mc[dy*nx+(int)x];
     M[8]=Mc[dy*nx+dx];
 
     //printf(" Subpixel precision (%f, %f) => ",x[i],y[i]);
     //calculate the maximum of the quadratic interpolation
-    maximum_interpolation(M, x[i], y[i]);
+    maximum_interpolation(M, corners[i]);
     //printf("(%f, %f)\n",x[i],y[i]);
   }
     
 }
     
 
+//#define GAUSSIAN_LUIS
   
 /**
   *
@@ -372,14 +380,14 @@ void subpixel_precision(
 **/
 void harris(
   float *I,         // input image
-  vector<float> &x, // output selected points (x coordinates)
-  vector<float> &y, // output selected points (y coordinates)
+  vector<harris_corner> &corners, // output selected corners
+  int   measure,    // measure for the discriminant function
   float k,          // Harris constant for the ....function
   float sigma_i,    // standard deviation for smoothing (image denoising)    
   float sigma_n,    // standard deviation for smoothing (pixel neighbourhood)
   int   radius,     // radius of the autocorralation matrix
-  float percentage,    
-  int   measure,    // measure for the discriminant function
+  int   select_strategy, // strategy for the output corners
+  int   Nselect,    // number of output corners
   int   precision,  // enable subpixel precision
   int   nx,         // number of columns of the image
   int   ny,         // number of rows of the image
@@ -402,10 +410,13 @@ void harris(
     
      gettimeofday(&start, NULL);    
   }
-  
+
+#ifdef GAUSSIAN_LUIS
   gaussian(I, nx, ny, sigma_i);
-  
-  
+#else
+  gaussian_sii(I, nx, ny, sigma_i);
+#endif
+
   if (verbose)
   {  
      gettimeofday(&end, NULL);
@@ -463,10 +474,16 @@ void harris(
      C[i] = Iy[i]*Iy[i];
   }
 
+#ifdef GAUSSIAN_LUIS
   gaussian(A, nx, ny, sigma_n);
   gaussian(B, nx, ny, sigma_n);
   gaussian(C, nx, ny, sigma_n);
-
+#else
+  gaussian_sii(A, nx, ny, sigma_n);
+  gaussian_sii(B, nx, ny, sigma_n);
+  gaussian_sii(C, nx, ny, sigma_n);
+#endif
+  
   if (verbose) 
   {  
      gettimeofday(&end, NULL);
@@ -499,14 +516,13 @@ void harris(
   }
 
   if (verbose) 
-  {  
+  {
      gettimeofday(&end, NULL);
      printf("Time: %fs\n", ((end.tv_sec-start.tv_sec)* 1000000u + 
             end.tv_usec - start.tv_usec) / 1.e6);
      
      printf("  -Mc max=%f, Mc min=%f\n",max, min);     
-  }    
-
+  }
 
   // Non-maximum suppression
   if (verbose) 
@@ -515,10 +531,8 @@ void harris(
      gettimeofday(&start, NULL);     
   }
 
-  x.reserve(1000);
-  y.reserve(1000);
-  non_maximum_suppression(Mc, x, y, radius, nx, ny, verbose);
-
+  corners.reserve(1000);
+  non_maximum_suppression(Mc, corners, radius, nx, ny, verbose);
 
   if (verbose) 
   {
@@ -528,7 +542,21 @@ void harris(
   }
 
 
-  //AQUI VA EL CODIGO PARA SELECCIONAR LOS PUNTOS (sort, ...)
+  //Select output corners depending on the strategy
+  switch(select_strategy) {
+    case ALL_CORNERS:
+      sort(corners.begin(), corners.end());
+      break;
+    case N_CORNERS:
+      sort(corners.begin(), corners.end());
+      corners.erase(corners.begin()+Nselect, corners.end());
+      break;
+    case DISTRIBUTED_N_CORNERS:
+      sort(corners.begin(), corners.end());
+      corners.erase(corners.begin()+Nselect, corners.end());
+      break;
+  }
+
 
   //compute subpixel precision through quadratic interpolation
   if(precision)
@@ -539,7 +567,7 @@ void harris(
        gettimeofday(&start, NULL);
     }
 
-    subpixel_precision(Mc, x, y, nx);
+    subpixel_precision(Mc, corners, nx);
 
     if (verbose)
     {      
@@ -548,10 +576,10 @@ void harris(
             end.tv_usec - start.tv_usec) / 1.e6);
     }
   }
-      
+
   if(forensics)
   {
-    printf("  -Number of detected corner points: %ld\n", x.size());
+    printf("  -Number of detected corner points: %ld\n", corners.size());
     printf("  -Saving Mc.png \n");
     for(int i=0;i<nx*ny;i++) Mc[i]=255*(Mc[i]-min)/(max-min); 
     char name[200]="Mc.png";

@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/time.h> 
+#include <math.h>
+#include <float.h>
 
 #include "harris.h"
 
@@ -14,9 +16,10 @@ extern "C"
 #define PAR_DEFAULT_K 0.06
 #define PAR_DEFAULT_SIGMA_I 1.0
 #define PAR_DEFAULT_SIGMA_N 2.5
-#define PAR_DEFAULT_PERCENTAGE 0.1
 #define PAR_DEFAULT_RADIUS 5
 #define PAR_DEFAULT_MEASURE HARRIS_MEASURE
+#define PAR_DEFAULT_SELECT_STRATEGY N_CORNERS
+#define PAR_DEFAULT_NSELECT 2000
 #define PAR_DEFAULT_SUBPIXEL_PRECISION 0
 #define PAR_DEFAULT_VERBOSE 0
 #define PAR_DEFAULT_FORENSIC 0
@@ -39,6 +42,7 @@ void print_help(char *name)
   printf("  --------\n");
   printf("   -o name  output image with detected corners \n");
   printf("   -f name  write points to file\n");
+  printf("   -m       choose measure: 0.Harris; 1.Shi-Tomasi; 2.Harmonic Mean\n"); 
   printf("   -k N     Harris' K parameter\n");
   printf("              default value %f\n", PAR_DEFAULT_K);
   printf("   -i N     Gauss standard deviation for image denoising\n");
@@ -47,10 +51,11 @@ void print_help(char *name)
   printf("              default value %f\n", PAR_DEFAULT_SIGMA_N);
   printf("   -w N     window radius size\n");
   printf("              default value %d\n", PAR_DEFAULT_RADIUS);
-  printf("   -p N     percentage with respect to the maximum for selecting points\n");
-  printf("              default value %f\n", PAR_DEFAULT_PERCENTAGE);
-  printf("   -m       choose measure: 0.Harris; 1.Shi-Tomasi; 2.Harmonic Mean\n"); 
-  printf("   -q       subpixel precision through quadratic interpolation\n"); 
+  printf("   -q N     strategy for selecting the output corners\n");
+  printf("              default value %d\n", PAR_DEFAULT_SELECT_STRATEGY);
+  printf("   -N N     number of output corners\n");
+  printf("              default value %d\n", PAR_DEFAULT_NSELECT);
+  printf("   -p       subpixel precision through quadratic interpolation\n"); 
   printf("   -v       switch on verbose mode \n");
   printf("   -b       switch on forensic mode \n\n\n");  
 }
@@ -68,12 +73,13 @@ int read_parameters(
   char  **image,  
   char  **out_image,
   char  **out_file,
+  int   &measure,
   float &k,
   float &sigma_i,  
   float &sigma_n,
   int   &radius,
-  float &percentage,
-  int   &measure,
+  int   &select_strategy,
+  int   &Nselect,
   int   &subpixel_precision,  
   int   &verbose,
   int   &forensic 
@@ -91,12 +97,13 @@ int read_parameters(
     k=PAR_DEFAULT_K;
     sigma_i=PAR_DEFAULT_SIGMA_I;    
     sigma_n=PAR_DEFAULT_SIGMA_N;
+    measure=PAR_DEFAULT_MEASURE;
     radius=PAR_DEFAULT_RADIUS;
+    select_strategy=PAR_DEFAULT_SELECT_STRATEGY;
+    Nselect=PAR_DEFAULT_NSELECT;
+    subpixel_precision=PAR_DEFAULT_SUBPIXEL_PRECISION;
     verbose=PAR_DEFAULT_VERBOSE;
     forensic=PAR_DEFAULT_FORENSIC;
-    percentage=PAR_DEFAULT_PERCENTAGE;
-    measure=PAR_DEFAULT_MEASURE;
-    subpixel_precision=PAR_DEFAULT_SUBPIXEL_PRECISION;
     
     //read each parameter from the command line
     while(i<argc)
@@ -109,6 +116,9 @@ int read_parameters(
         if(i<argc-1)
           *out_file=argv[++i];
       
+      if(strcmp(argv[i],"-m")==0)
+        measure=atoi(argv[++i]);
+
       if(strcmp(argv[i],"-k")==0)
         if(i<argc-1)
           k=atof(argv[++i]);
@@ -125,14 +135,15 @@ int read_parameters(
         if(i<argc-1)
           radius=atoi(argv[++i]);
 
-      if(strcmp(argv[i],"-p")==0)
-        if(i<argc-1)
-          percentage=atof(argv[++i]);
-
-      if(strcmp(argv[i],"-m")==0)
-        measure=atoi(argv[++i]);
-
       if(strcmp(argv[i],"-q")==0)
+        if(i<argc-1)
+          select_strategy=atoi(argv[++i]);
+	
+      if(strcmp(argv[i],"-N")==0)
+        if(i<argc-1)
+          Nselect=atoi(argv[++i]);
+
+      if(strcmp(argv[i],"-p")==0)
         subpixel_precision=1;
 
       if(strcmp(argv[i],"-v")==0)
@@ -148,10 +159,8 @@ int read_parameters(
     if (k<=0)        k       = PAR_DEFAULT_K;
     if (sigma_i<0)   sigma_i = PAR_DEFAULT_SIGMA_I;
     if (sigma_n<0)   sigma_n = PAR_DEFAULT_SIGMA_N;
-    if (radius<1)    radius  = PAR_DEFAULT_RADIUS;
-    
-    if (measure<0 || measure>2) measure = PAR_DEFAULT_MEASURE;
-    if (percentage<0 || percentage>1) percentage    = PAR_DEFAULT_PERCENTAGE;
+    if (radius<1)    radius  = PAR_DEFAULT_RADIUS;    
+    if (Nselect<1)   Nselect = PAR_DEFAULT_NSELECT;
   }
 
   return 1;
@@ -161,38 +170,51 @@ int read_parameters(
 
 void draw_points(
   float *I, 
-  std::vector<float> &x, 
-  std::vector<float> &y, 
+  std::vector<harris_corner> &corners, 
   int nx, 
   int nz,
   int radius
 )
 {
+  float max=FLT_MIN;
+  
+  //find maximum of Harris' measure
+  for(unsigned int i=0;i<corners.size();i++)
+    if(corners[i].Mc>max) max=corners[i].Mc;
+  
   //draw a cross for each corner
   if(nz>=3)
-    for(unsigned int i=0;i<x.size();i++)
+    for(unsigned int i=0;i<corners.size();i++)
     {
-      for(int j=x[i]-radius;j<=x[i]+radius;j++)
+      const float x=corners[i].x;
+      const float y=corners[i].y;
+      const float C=std::max(50., 255.-255*pow(1-corners[i].Mc/max,5));
+      
+      for(int j=x-radius;j<=x+radius;j++)
       {
-	I[((int)y[i]*nx+j)*nz]=0;
-	I[((int)y[i]*nx+j)*nz+1]=0;
-	I[((int)y[i]*nx+j)*nz+2]=255;
+	I[((int)y*nx+j)*nz]=0;
+	I[((int)y*nx+j)*nz+1]=0;
+	I[((int)y*nx+j)*nz+2]=C;
       }
       
-      for(int j=y[i]-radius;j<=y[i]+radius;j++)
+      for(int j=y-radius;j<=y+radius;j++)
       {
-	I[(j*nx+(int)x[i])*nz]=0;
-	I[(j*nx+(int)x[i])*nz+1]=0;
-	I[(j*nx+(int)x[i])*nz+2]=255;
+	I[(j*nx+(int)x)*nz]=0;
+	I[(j*nx+(int)x)*nz+1]=0;
+	I[(j*nx+(int)x)*nz+2]=C;
       }
     }
   else
-    for(unsigned int i=0;i<x.size();i++)
+    for(unsigned int i=0;i<corners.size();i++)
     {
-      for(int j=x[i]-radius;j<=x[i]+radius;j++)
-	I[(int)y[i]*nx+j]=255;
-      for(int j=y[i]-radius;j<=y[i]+radius;j++)
-	I[j*nx+(int)x[i]]=255;
+      const float x=corners[i].x;
+      const float y=corners[i].y;
+      const float C=pow(0.3,1-corners[i].Mc/max);
+      
+      for(int j=x-radius;j<=x+radius;j++)
+	I[(int)y*nx+j]=255*C;
+      for(int j=y-radius;j<=y+radius;j++)
+	I[j*nx+(int)x]=255*C;
     }
 }
 
@@ -222,15 +244,15 @@ int main(int argc, char *argv[])
 {
   //parameters of the method
   char  *image, *out_image=NULL, *out_file=NULL;
-  float k, sigma_i, sigma_n, percentage;
-  int   radius, measure, subpixel_precision;
+  float k, sigma_i, sigma_n;
+  int   select_strategy, Nselect, radius, measure, subpixel_precision;
   int   verbose, forensic;
     
   //read the parameters from the console
   int result=read_parameters(
         argc, argv, &image, &out_image, &out_file, 
-        k, sigma_i, sigma_n, radius, percentage, 
-        measure, subpixel_precision, verbose, forensic
+        measure, k, sigma_i, sigma_n, radius, select_strategy, 
+        Nselect, subpixel_precision, verbose, forensic
       );
   
   if(result)
@@ -242,16 +264,16 @@ int main(int argc, char *argv[])
       printf(
         "Parameters:\n"
         "  Input image: '%s', Output image: '%s', Output corner file: %s\n"
-        "  K: %f, Sigma_i: %f, Sigma_n: %f, Window radius: %d, Percentage: %f\n"
-        "  measure: %d, nx: %d, ny: %d, nz: %d\n",
-        image, out_image, out_file, k, sigma_i, sigma_n, radius, percentage,
-        measure, nx, ny, nz
+        "  measure: %d, K: %f, Sigma_i: %f, Sigma_n: %f, Window radius: %d, \n"
+        "  Select strategy: %d, Nselect: %d, nx: %d, ny: %d, nz: %d\n",
+        image, out_image, out_file,  measure, k, sigma_i, sigma_n, radius, 
+	select_strategy, Nselect, nx, ny, nz
       );
     
     
     if (Ic!=NULL)
     {
-      std::vector<float> x,y;
+      std::vector<harris_corner> corners;
       float *I=new float[nx*ny];
       
       if(nz>1)
@@ -267,8 +289,8 @@ int main(int argc, char *argv[])
 
       //compute Harris' corners
       harris(
-        I, x, y, k, sigma_i, sigma_n, radius, percentage, 
-        measure, subpixel_precision, nx, ny, verbose, forensic
+        I, corners, measure, k, sigma_i, sigma_n, radius, select_strategy,
+	Nselect, subpixel_precision, nx, ny, verbose, forensic
       );
       
       if (verbose) 
@@ -281,15 +303,15 @@ int main(int argc, char *argv[])
   
       if(out_image!=NULL)
       {
-	draw_points(Ic, x, y, nx, nz, radius);
+	draw_points(Ic, corners, nx, nz, radius);
 	iio_save_image_float_vec(out_image, Ic, nx, ny, nz);
       }
 	
       if(out_file!=NULL)
       {
 	FILE *fd=fopen(out_file,"w");
-	for(unsigned int i=0;i<x.size();i++)
-	  fprintf(fd, "%f %f\n", x[i],y[i]);
+	for(unsigned int i=0;i<corners.size();i++)
+	  fprintf(fd, "%f %f %f\n", corners[i].x, corners[i].y, corners[i].Mc);
 	fclose(fd);
       }
 

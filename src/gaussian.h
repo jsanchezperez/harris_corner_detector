@@ -16,4 +16,19 @@ gaussian (
 );
 
 
+/**
+ *
+ * Convolution with a Gaussian using Stacked Integral Images
+ *
+ */
+void
+gaussian_sii (
+  float *I,     //input/output image
+  int   nx,     //image width
+  int   ny,     //image height
+  float sigma,  //Gaussian sigma
+  int   K=5     //defines the number of iterations
+);
+
+
 #endif
