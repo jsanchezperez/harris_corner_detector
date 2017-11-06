@@ -14,22 +14,27 @@ extern "C"
 #include "interpolation.h"
 
 
+using namespace std;
+
+
 /**
   *
   * Function for computing Harris's corner measure
   *
 **/
 void harris_measure(
-  float *A, float *B, float *C,
-  float *Mc,
-  int nx, int ny, 
-  float k,
-  float &max, float &min
+  float *A,   //upper-left coefficient of the Autocorrelation matrix
+  float *B,   //symmetric coefficient of the Autocorrelation matrix
+  float *C,   //bottom-right coefficient of the Autocorrelation matrix
+  float *Mc,  //Harris measure function
+  int   nx,   //number of columns of the image
+  int   ny,   //number of rows of the image
+  float k,    //Harris coefficient for the measure function
+  float &max, //output max value
+  float &min  //output min value
 )
 {
-  int size = nx*ny;
-
-  for (int i=0;i<size;i++)
+  for (int i=0;i<nx*ny;i++)
   {
       float detA   = A[i]*C[i] - B[i]*B[i];
       float traceA = A[i] + C[i];
@@ -44,22 +49,24 @@ void harris_measure(
 
 /**
   *
-  * Function for computing Zseliski measure
+  * Function for computing harmonic mean measure
   *
 **/
-void zseliski_measure(
-  float *A, float *B, float *C,
-  float *Mc,
-  int nx, int ny,
-  float &max, float &min
+void harmonic_mean_measure(
+  float *A,   //upper-left coefficient of the Autocorrelation matrix
+  float *B,   //symmetric coefficient of the Autocorrelation matrix
+  float *C,   //bottom-right coefficient of the Autocorrelation matrix
+  float *Mc,  //Harris measure function
+  int   nx,   //number of columns of the image
+  int   ny,   //number of rows of the image
+  float &max, //output max value
+  float &min  //output min value
 )
 {
-  int size = nx*ny;
-
-  for (int i=0;i<size;i++)
+  for (int i=0;i<nx*ny;i++)
   {
-      float detA   = A[i]*C[i] - B[i]*B[i];
-      float traceA = A[i] + C[i];
+      float detA   = A[i]*C[i]-B[i]*B[i];
+      float traceA = A[i]+C[i];
 
       Mc[i] = 2*detA / (traceA+0.0001);
 
@@ -69,22 +76,37 @@ void zseliski_measure(
 }
 
 
-
 /**
   *
-  * Function for computing Shid-Tomasi measure
+  * Function for computing Shi-Tomasi measure
   *
 **/
 void shi_tomasi_measure(
-  float *A, float *B, float *C,
-  float *Mc,
-  int nx, int ny, 
-  float th
+  float *A,   //upper-left coefficient of the Autocorrelation matrix
+  float *B,   //symmetric coefficient of the Autocorrelation matrix
+  float *C,   //bottom-right coefficient of the Autocorrelation matrix
+  float *Mc,  //Harris measure function
+  int   nx,   //number of columns of the image
+  int   ny,   //number of rows of the image
+  float th,   //Shi-Tomasi threshold for the minimum eigenvalue
+  float &max, //output max value
+  float &min  //output min value
 )
 {
-  printf("\n\n Shi-tomasi_measure: not implemented yet !!! \n\n");
-}
+  for (int i=0;i<nx*ny;i++)
+  {
+      float D = sqrt(A[i]*A[i]-2*A[i]*C[i]+4*B[i]*B[i]+C[i]*C[i]);
+      float lmin = 0.5*(A[i]+C[i])-0.5*D;
 
+      if(lmin>th)
+        Mc[i]=lmin;
+      else
+	Mc[i]=0;
+
+      if (Mc[i]>max)  max = Mc[i];
+      if (Mc[i]<min)  min = Mc[i];
+  }
+}
 
 
 /**
@@ -154,8 +176,8 @@ void spiral_order(
 **/
 void non_maximum_suppression(
   float *I,             // input image
-  std::vector<float> &x,  // x position of maxima
-  std::vector<float> &y,  // y position of maxima
+  vector<float> &x,  // x position of maxima
+  vector<float> &y,  // y position of maxima
   int   radius,         // window radius
   int   nx,             // number of columns of the image
   int   ny,             // number of rows of the image
@@ -310,8 +332,8 @@ void non_maximum_suppression(
 **/
 void subpixel_precision(
   float *Mc,             // discriminant function
-  std::vector<float> &x, // selected points (x coordinates)
-  std::vector<float> &y, // selected points (y coordinates)
+  vector<float> &x, // selected points (x coordinates)
+  vector<float> &y, // selected points (y coordinates)
   int nx
 )
 {
@@ -349,20 +371,20 @@ void subpixel_precision(
   *
 **/
 void harris(
-  float *I,            // input image
-  std::vector<float> &x, // output selected points (x coordinates)
-  std::vector<float> &y, // output selected points (y coordinates)
-  float k,             // Harris constant for the ....function
-  float sigma_i,       // standard deviation for smoothing (image denoising)    
-  float sigma_n,       // standard deviation for smoothing (pixel neighbourhood)
-  int   radius,        // radius of the autocorralation matrix
+  float *I,         // input image
+  vector<float> &x, // output selected points (x coordinates)
+  vector<float> &y, // output selected points (y coordinates)
+  float k,          // Harris constant for the ....function
+  float sigma_i,    // standard deviation for smoothing (image denoising)    
+  float sigma_n,    // standard deviation for smoothing (pixel neighbourhood)
+  int   radius,     // radius of the autocorralation matrix
   float percentage,    
-  int   nobel_measure,
-  int   precision,
-  int   nx,            // number of columns of the image
-  int   ny,            // number of rows of the image
-  int   verbose,       // activate verbose mode
-  int   forensics      // activate forensics mode  
+  int   measure,    // measure for the discriminant function
+  int   precision,  // enable subpixel precision
+  int   nx,         // number of columns of the image
+  int   ny,         // number of rows of the image
+  int   verbose,    // activate verbose mode
+  int   forensics   // activate forensics mode  
 )
 {
   int size=nx*ny;
@@ -451,7 +473,7 @@ void harris(
      printf("\n Time: %fs\n", ((end.tv_sec-start.tv_sec)* 1000000u + 
             end.tv_usec - start.tv_usec) / 1.e6);
 
-    printf(" 4.Computing one of the measures (0.Harris, 1.Shi-Tomasi, 2.Szeliski): %d\n", nobel_measure);
+    printf(" 4.Computing one of the measures (0.Harris, 1.Shi-Tomasi, 2.Szeliski): %d\n", measure);
     gettimeofday(&start, NULL);     
   }
 
@@ -459,15 +481,22 @@ void harris(
   float min = FLT_MAX;
 
   //compute the discriminant function following one strategy
-  if (nobel_measure == 0)
-     harris_measure( A, B, C, Mc, nx, ny, k, max, min );
-
-  if (nobel_measure == 1)
-     shi_tomasi_measure( A, B, C, Mc, nx, ny, 0.0 );
-
-  if (nobel_measure == 2)
-     zseliski_measure( A, B, C, Mc, nx, ny, max, min );
-
+  switch(measure) {
+    case HARMONIC_MEAN_MEASURE: 
+      if(verbose)
+        printf("   Harmonic mean measure\n");
+      harmonic_mean_measure(A, B, C, Mc, nx, ny, max, min);
+      break;
+    case SHI_TOMASI_MEASURE:
+      if(verbose)
+        printf("   Shi-Tomasi measure\n");
+     shi_tomasi_measure(A, B, C, Mc, nx, ny, k, max, min);
+     break;
+    default:
+      if(verbose)
+        printf("   Harris measure\n");
+      harris_measure(A, B, C, Mc, nx, ny, k, max, min);
+  }
 
   if (verbose) 
   {  
@@ -541,3 +570,5 @@ void harris(
   delete []B;
   delete []C;
 }
+
+

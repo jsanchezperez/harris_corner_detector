@@ -16,12 +16,11 @@ extern "C"
 #define PAR_DEFAULT_SIGMA_N 2.5
 #define PAR_DEFAULT_PERCENTAGE 0.1
 #define PAR_DEFAULT_RADIUS 5
-#define PAR_DEFAULT_NOBEL_MEASURE 0
+#define PAR_DEFAULT_MEASURE HARRIS_MEASURE
 #define PAR_DEFAULT_SUBPIXEL_PRECISION 0
 #define PAR_DEFAULT_VERBOSE 0
 #define PAR_DEFAULT_FORENSIC 0
 
-//using namespace std;
 
 
 /**
@@ -50,7 +49,7 @@ void print_help(char *name)
   printf("              default value %d\n", PAR_DEFAULT_RADIUS);
   printf("   -p N     percentage with respect to the maximum for selecting points\n");
   printf("              default value %f\n", PAR_DEFAULT_PERCENTAGE);
-  printf("   -n       use Nobel's measure: 0=Harris; 1=Shid-Tomasi; 2=Zseliski\n"); 
+  printf("   -m       choose measure: 0.Harris; 1.Shi-Tomasi; 2.Harmonic Mean\n"); 
   printf("   -q       subpixel precision through quadratic interpolation\n"); 
   printf("   -v       switch on verbose mode \n");
   printf("   -b       switch on forensic mode \n\n\n");  
@@ -74,7 +73,7 @@ int read_parameters(
   float &sigma_n,
   int   &radius,
   float &percentage,
-  int   &nobel_measure,
+  int   &measure,
   int   &subpixel_precision,  
   int   &verbose,
   int   &forensic 
@@ -96,7 +95,7 @@ int read_parameters(
     verbose=PAR_DEFAULT_VERBOSE;
     forensic=PAR_DEFAULT_FORENSIC;
     percentage=PAR_DEFAULT_PERCENTAGE;
-    nobel_measure=PAR_DEFAULT_NOBEL_MEASURE;
+    measure=PAR_DEFAULT_MEASURE;
     subpixel_precision=PAR_DEFAULT_SUBPIXEL_PRECISION;
     
     //read each parameter from the command line
@@ -110,7 +109,7 @@ int read_parameters(
         if(i<argc-1)
           *out_file=argv[++i];
       
-      if(strcmp(argv[i],"-a")==0)
+      if(strcmp(argv[i],"-k")==0)
         if(i<argc-1)
           k=atof(argv[++i]);
 
@@ -130,8 +129,8 @@ int read_parameters(
         if(i<argc-1)
           percentage=atof(argv[++i]);
 
-      if(strcmp(argv[i],"-n")==0)
-        nobel_measure=atoi(argv[++i]); //1;
+      if(strcmp(argv[i],"-m")==0)
+        measure=atoi(argv[++i]);
 
       if(strcmp(argv[i],"-q")==0)
         subpixel_precision=1;
@@ -151,8 +150,8 @@ int read_parameters(
     if (sigma_n<0)   sigma_n = PAR_DEFAULT_SIGMA_N;
     if (radius<1)    radius  = PAR_DEFAULT_RADIUS;
     
-    if (nobel_measure<0 || nobel_measure>2) nobel_measure = PAR_DEFAULT_NOBEL_MEASURE;
-    if (percentage<0 || percentage>1)       percentage    = PAR_DEFAULT_PERCENTAGE;
+    if (measure<0 || measure>2) measure = PAR_DEFAULT_MEASURE;
+    if (percentage<0 || percentage>1) percentage    = PAR_DEFAULT_PERCENTAGE;
   }
 
   return 1;
@@ -224,14 +223,14 @@ int main(int argc, char *argv[])
   //parameters of the method
   char  *image, *out_image=NULL, *out_file=NULL;
   float k, sigma_i, sigma_n, percentage;
-  int   radius, nobel_measure, subpixel_precision;
+  int   radius, measure, subpixel_precision;
   int   verbose, forensic;
     
   //read the parameters from the console
   int result=read_parameters(
         argc, argv, &image, &out_image, &out_file, 
         k, sigma_i, sigma_n, radius, percentage, 
-        nobel_measure, subpixel_precision, verbose, forensic
+        measure, subpixel_precision, verbose, forensic
       );
   
   if(result)
@@ -244,9 +243,9 @@ int main(int argc, char *argv[])
         "Parameters:\n"
         "  Input image: '%s', Output image: '%s', Output corner file: %s\n"
         "  K: %f, Sigma_i: %f, Sigma_n: %f, Window radius: %d, Percentage: %f\n"
-        "  Nobel's measure: %d, nx: %d, ny: %d, nz: %d\n",
+        "  measure: %d, nx: %d, ny: %d, nz: %d\n",
         image, out_image, out_file, k, sigma_i, sigma_n, radius, percentage,
-        nobel_measure, nx, ny, nz
+        measure, nx, ny, nz
       );
     
     
@@ -269,7 +268,7 @@ int main(int argc, char *argv[])
       //compute Harris' corners
       harris(
         I, x, y, k, sigma_i, sigma_n, radius, percentage, 
-        nobel_measure, subpixel_precision, nx, ny, verbose, forensic
+        measure, subpixel_precision, nx, ny, verbose, forensic
       );
       
       if (verbose) 
