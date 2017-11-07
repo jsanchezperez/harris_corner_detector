@@ -55,9 +55,9 @@ void compute_autocorrelation_matrix(
      C[i] = Iy[i]*Iy[i];
   }
 
-  gaussian_sii(A, nx, ny, sigma);
-  gaussian_sii(B, nx, ny, sigma);
-  gaussian_sii(C, nx, ny, sigma);
+  gaussian(A, nx, ny, sigma);
+  gaussian(B, nx, ny, sigma);
+  gaussian(C, nx, ny, sigma);
 } 
 
 
@@ -340,7 +340,7 @@ void non_maximum_suppression(
   *
 **/
 void subpixel_precision(
-  float *Mc,             // discriminant function
+  float *Mc,  // discriminant function
   vector<harris_corner> &corners, // selected corners
   int nx
 )
@@ -470,7 +470,7 @@ void harris(
   }
 
   //smooth the original image to reduce noise
-  gaussian_sii(I, nx, ny, sigma_i);
+  gaussian(I, nx, ny, sigma_i);
 
   if (verbose)
   {  
@@ -526,7 +526,7 @@ void harris(
 
   float max  = FLT_MIN;
   float min  = FLT_MAX;
-  
+
   //compute the discriminant function following one strategy 
   //Harris, Shi-Tomasi, Harmonic mean
   compute_discriminant_function(A, B, C, Mc, measure, nx, ny, k, max, min);
@@ -561,11 +561,11 @@ void harris(
      printf("\n 6.Selecting output corners\n");
      gettimeofday(&start, NULL);     
   }
-  
+
   //select output corners depending on the strategy
   //all corners; all corners sorted; N corners; distributed corners
   select_output_corners(corners, select_strategy, cells, Nselect, nx, ny);
-  
+
   if (verbose) 
   {
      gettimeofday(&end, NULL);
@@ -601,7 +601,6 @@ void harris(
     iio_save_image_float_vec(name, Mc, nx, ny, 1);
 
     printf("  -Saving selected_Mc.png \n");
-    //for(int i=0;i<nx*ny;i++) if(local_max[i]==0) Mc[i]=0; 
     char name1[200]="selected_Mc.png";
     iio_save_image_float_vec(name1, Mc, nx, ny, 1);
   }
@@ -613,5 +612,3 @@ void harris(
   delete []B;
   delete []C;
 }
-
-
