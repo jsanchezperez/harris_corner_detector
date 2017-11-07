@@ -12,18 +12,16 @@ extern "C"
 #include "iio.h"
 }
 
-
 #define PAR_DEFAULT_K 0.06
 #define PAR_DEFAULT_SIGMA_I 1.0
 #define PAR_DEFAULT_SIGMA_N 2.5
 #define PAR_DEFAULT_RADIUS 5
 #define PAR_DEFAULT_MEASURE HARRIS_MEASURE
-#define PAR_DEFAULT_SELECT_STRATEGY N_CORNERS
+#define PAR_DEFAULT_SELECT_STRATEGY ALL_CORNERS
+#define PAR_DEFAULT_CELLS 1
 #define PAR_DEFAULT_NSELECT 2000
 #define PAR_DEFAULT_SUBPIXEL_PRECISION 0
 #define PAR_DEFAULT_VERBOSE 0
-#define PAR_DEFAULT_FORENSIC 0
-
 
 
 /**
@@ -42,7 +40,9 @@ void print_help(char *name)
   printf("  --------\n");
   printf("   -o name  output image with detected corners \n");
   printf("   -f name  write points to file\n");
-  printf("   -m       choose measure: 0.Harris; 1.Shi-Tomasi; 2.Harmonic Mean\n"); 
+  printf("   -m N     choose measure: \n"); 
+  printf("              0.Harris; 1.Shi-Tomasi; 2.Harmonic Mean\n"); 
+  printf("              default value %d\n", PAR_DEFAULT_MEASURE);
   printf("   -k N     Harris' K parameter\n");
   printf("              default value %f\n", PAR_DEFAULT_K);
   printf("   -i N     Gauss standard deviation for image denoising\n");
@@ -51,15 +51,17 @@ void print_help(char *name)
   printf("              default value %f\n", PAR_DEFAULT_SIGMA_N);
   printf("   -w N     window radius size\n");
   printf("              default value %d\n", PAR_DEFAULT_RADIUS);
-  printf("   -q N     strategy for selecting the output corners\n");
+  printf("   -q N     strategy for selecting the output corners:\n");
+  printf("              0.All corners; 1.Sort all corners;\n");
+  printf("              2.N corners; 3.Distributed N corners\n");
   printf("              default value %d\n", PAR_DEFAULT_SELECT_STRATEGY);
+  printf("   -c N     regions for output corners (1x1, 2x2,...NxN):\n");
+  printf("              default value %d\n", PAR_DEFAULT_CELLS);
   printf("   -N N     number of output corners\n");
   printf("              default value %d\n", PAR_DEFAULT_NSELECT);
-  printf("   -p       subpixel precision through quadratic interpolation\n"); 
+  printf("   -p       subpixel precision through quadratic interpolation\n");
   printf("   -v       switch on verbose mode \n");
-  printf("   -b       switch on forensic mode \n\n\n");  
 }
-
 
 
 /**
@@ -79,10 +81,10 @@ int read_parameters(
   float &sigma_n,
   int   &radius,
   int   &select_strategy,
+  int   &cells,
   int   &Nselect,
   int   &subpixel_precision,  
-  int   &verbose,
-  int   &forensic 
+  int   &verbose
 )
 {
   if (argc < 2){
@@ -100,10 +102,10 @@ int read_parameters(
     measure=PAR_DEFAULT_MEASURE;
     radius=PAR_DEFAULT_RADIUS;
     select_strategy=PAR_DEFAULT_SELECT_STRATEGY;
+    cells=PAR_DEFAULT_CELLS;
     Nselect=PAR_DEFAULT_NSELECT;
     subpixel_precision=PAR_DEFAULT_SUBPIXEL_PRECISION;
     verbose=PAR_DEFAULT_VERBOSE;
-    forensic=PAR_DEFAULT_FORENSIC;
     
     //read each parameter from the command line
     while(i<argc)
@@ -139,6 +141,10 @@ int read_parameters(
         if(i<argc-1)
           select_strategy=atoi(argv[++i]);
 	
+      if(strcmp(argv[i],"-c")==0)
+        if(i<argc-1)
+          cells=atoi(argv[++i]);
+	
       if(strcmp(argv[i],"-N")==0)
         if(i<argc-1)
           Nselect=atoi(argv[++i]);
@@ -149,18 +155,16 @@ int read_parameters(
       if(strcmp(argv[i],"-v")==0)
         verbose=1;
       
-      if(strcmp(argv[i],"-b")==0)
-        forensic=1;
-      
       i++;
     }
 
     //check parameter values
-    if (k<=0)        k       = PAR_DEFAULT_K;
-    if (sigma_i<0)   sigma_i = PAR_DEFAULT_SIGMA_I;
-    if (sigma_n<0)   sigma_n = PAR_DEFAULT_SIGMA_N;
-    if (radius<1)    radius  = PAR_DEFAULT_RADIUS;    
-    if (Nselect<1)   Nselect = PAR_DEFAULT_NSELECT;
+    if(k<=0)      k       = PAR_DEFAULT_K;
+    if(sigma_i<0) sigma_i = PAR_DEFAULT_SIGMA_I;
+    if(sigma_n<0) sigma_n = PAR_DEFAULT_SIGMA_N;
+    if(radius<1)  radius  = PAR_DEFAULT_RADIUS;    
+    if(cells<0)   cells   = PAR_DEFAULT_CELLS;
+    if(Nselect<1) Nselect = PAR_DEFAULT_NSELECT;
   }
 
   return 1;
@@ -168,62 +172,96 @@ int read_parameters(
 
 
 
+/**
+ *
+ *  Draw the Harris' corners and the cells on the image
+ *
+ */
 void draw_points(
   float *I, 
-  std::vector<harris_corner> &corners, 
+  std::vector<harris_corner> &corners,
+  int cells,
   int nx, 
+  int ny, 
   int nz,
   int radius
 )
 {
-  float max=FLT_MIN;
   
-  //find maximum of Harris' measure
-  for(unsigned int i=0;i<corners.size();i++)
-    if(corners[i].Mc>max) max=corners[i].Mc;
-  
+  //draw cells limits
+  for(int i=0; i<cells; i++)
+  {
+    int Dx=nx/cells;
+    int dx=Dx;
+    while(dx<nx)
+    {
+      if(nz>=3)
+        for(int y=0;y<ny;y++)
+        {
+          I[(y*nx+dx)*nz]=0;
+          I[(y*nx+dx)*nz+1]=0;
+          I[(y*nx+dx)*nz+2]=0;
+        }
+      else
+        for(int y=0;y<ny;y++)
+          I[y*nx+dx]=0;
+          
+      dx+=Dx;
+    }
+    
+    int Dy=ny/cells;
+    int dy=Dy;
+    while(dy<ny)
+    {
+      if(nz>=3)
+        for(int x=0;x<nx;x++)
+        {
+          I[(dy*nx+x)*nz]=0;
+          I[(dy*nx+x)*nz+1]=0;
+          I[(dy*nx+x)*nz+2]=0;
+        }    
+      else
+        for(int x=0;x<nx;x++)
+          I[dy*nx+x]=0;
+
+      dy+=Dy;
+    }
+  }
+
   //draw a cross for each corner
-  if(nz>=3)
-    for(unsigned int i=0;i<corners.size();i++)
-    {
-      const float x=corners[i].x;
-      const float y=corners[i].y;
-      const float C=std::max(50., 255.-255*pow(1-corners[i].Mc/max,5));
+  for(unsigned int i=0;i<corners.size();i++)
+  {
+    const float x=corners[i].x;
+    const float y=corners[i].y;
       
+    if(nz>=3)
       for(int j=x-radius;j<=x+radius;j++)
       {
-	I[((int)y*nx+j)*nz]=0;
-	I[((int)y*nx+j)*nz+1]=0;
-	I[((int)y*nx+j)*nz+2]=C;
+        I[((int)y*nx+j)*nz]=0;
+        I[((int)y*nx+j)*nz+1]=0;
+        I[((int)y*nx+j)*nz+2]=255;
       }
-      
+      else
+        for(int j=x-radius;j<=x+radius;j++)
+          I[(int)y*nx+j]=255;
+
+    if(nz>=3)
       for(int j=y-radius;j<=y+radius;j++)
       {
-	I[(j*nx+(int)x)*nz]=0;
-	I[(j*nx+(int)x)*nz+1]=0;
-	I[(j*nx+(int)x)*nz+2]=C;
+        I[(j*nx+(int)x)*nz]=0;
+        I[(j*nx+(int)x)*nz+1]=0;
+        I[(j*nx+(int)x)*nz+2]=255;
       }
-    }
-  else
-    for(unsigned int i=0;i<corners.size();i++)
-    {
-      const float x=corners[i].x;
-      const float y=corners[i].y;
-      const float C=pow(0.3,1-corners[i].Mc/max);
-      
-      for(int j=x-radius;j<=x+radius;j++)
-	I[(int)y*nx+j]=255*C;
-      for(int j=y-radius;j<=y+radius;j++)
-	I[j*nx+(int)x]=255*C;
-    }
+      else
+        for(int j=y-radius;j<=y+radius;j++)
+          I[j*nx+(int)x]=255;
+  }
 }
-
-
 
 
 /**
   *
-  *  Function to convert an rgb image to grayscale levels
+  *  Function for converting an rgb image to grayscale levels
   * 
 **/
 void rgb2gray(
@@ -238,61 +276,64 @@ void rgb2gray(
 }
 
 
-
-    
+/**
+ *
+ *  Main function
+ *
+ */
 int main(int argc, char *argv[]) 
 {
   //parameters of the method
   char  *image, *out_image=NULL, *out_file=NULL;
   float k, sigma_i, sigma_n;
-  int   select_strategy, Nselect, radius, measure, subpixel_precision;
-  int   verbose, forensic;
-    
+  int   select_strategy, Nselect, radius, measure;
+  int   subpixel_precision, cells, verbose;
+
   //read the parameters from the console
   int result=read_parameters(
         argc, argv, &image, &out_image, &out_file, 
         measure, k, sigma_i, sigma_n, radius, select_strategy, 
-        Nselect, subpixel_precision, verbose, forensic
+        cells, Nselect, subpixel_precision, verbose
       );
-  
+
   if(result)
   {
     int nx, ny, nz;   
     float *Ic=iio_read_image_float_vec(image, &nx, &ny, &nz);
-    
+
     if(verbose)
       printf(
         "Parameters:\n"
         "  Input image: '%s', Output image: '%s', Output corner file: %s\n"
         "  measure: %d, K: %f, Sigma_i: %f, Sigma_n: %f, Window radius: %d, \n"
-        "  Select strategy: %d, Nselect: %d, nx: %d, ny: %d, nz: %d\n",
+        "  Select strategy: %d, Number of cells: %d, Nselect: %d, \n"
+        "  nx: %d, ny: %d, nz: %d\n",
         image, out_image, out_file,  measure, k, sigma_i, sigma_n, radius, 
-	select_strategy, Nselect, nx, ny, nz
+        select_strategy, cells, Nselect, nx, ny, nz
       );
-    
-    
+
     if (Ic!=NULL)
     {
       std::vector<harris_corner> corners;
       float *I=new float[nx*ny];
-      
+
       if(nz>1)
-	rgb2gray(Ic, I, nx*ny);
+        rgb2gray(Ic, I, nx*ny);
       else
-	for(int i=0;i<nx*ny;i++)
-	  I[i]=Ic[i];
+        for(int i=0;i<nx*ny;i++)
+          I[i]=Ic[i];
 
       struct timeval start, end;
 
-      if (verbose) 
+      if (verbose)
         gettimeofday(&start, NULL);
 
       //compute Harris' corners
       harris(
         I, corners, measure, k, sigma_i, sigma_n, radius, select_strategy,
-	Nselect, subpixel_precision, nx, ny, verbose, forensic
+        cells, Nselect, subpixel_precision, nx, ny, verbose
       );
-      
+
       if (verbose) 
       {
         gettimeofday(&end, NULL);
@@ -300,19 +341,19 @@ int main(int argc, char *argv[])
                      end.tv_usec - start.tv_usec) / 1.e6; 
         printf("\n Time: %fs\n", delay);
       }
-  
+
       if(out_image!=NULL)
       {
-	draw_points(Ic, corners, nx, nz, radius);
-	iio_save_image_float_vec(out_image, Ic, nx, ny, nz);
+        draw_points(Ic, corners, cells, nx, ny, nz, radius);
+        iio_save_image_float_vec(out_image, Ic, nx, ny, nz);
       }
-	
+
       if(out_file!=NULL)
       {
-	FILE *fd=fopen(out_file,"w");
-	for(unsigned int i=0;i<corners.size();i++)
-	  fprintf(fd, "%f %f %f\n", corners[i].x, corners[i].y, corners[i].Mc);
-	fclose(fd);
+        FILE *fd=fopen(out_file,"w");
+        for(unsigned int i=0;i<corners.size();i++)
+          fprintf(fd, "%f %f %f %f\n", corners[i].x, corners[i].y, corners[i].Mcint, corners[i].Mc);
+        fclose(fd);
       }
 
       delete []I;

@@ -10,8 +10,9 @@
 
 //Strategies for selecting output corners
 #define ALL_CORNERS 0
-#define N_CORNERS 1
-#define DISTRIBUTED_N_CORNERS 2
+#define ALL_CORNERS_SORTED 1
+#define N_CORNERS 2
+#define DISTRIBUTED_N_CORNERS 3
 
 
 /**
@@ -21,13 +22,13 @@
 **/
 struct harris_corner{
   float x,y; //position of the corner
-  float Mc;  //Harris measure for this corner
+  float Mc, Mcint;  //Harris measure for this corner
 } ;
 
 
 /**
   *
-  * Function for computing Harris corners
+  * Main function for computing Harris corners
   *
 **/
 void harris(
@@ -39,12 +40,12 @@ void harris(
   float sigma_n,    // standard deviation for smoothing (pixel neighbourhood)
   int   radius,     // radius of the autocorralation matrix
   int   select_strategy, // strategy for the output corners
+  int   cells,      // number of regions in the image for distributed output
   int   Nselect,    // number of output corners
   int   precision,  // enable subpixel precision
   int   nx,         // number of columns of the image
   int   ny,         // number of rows of the image
-  int   verbose,    // activate verbose mode
-  int   forensics   // activate forensics mode  
+  int   verbose     // activate verbose mode
 );
 
 #endif

@@ -18,7 +18,6 @@ extern "C"
 using namespace std;
 
 
-
 /**
   *
   * Overload less function to compare two corners
@@ -34,92 +33,97 @@ bool operator<(
 
 /**
   *
-  * Function for computing Harris's corner measure
+  * Function for computing the Autocorrelation matrix
   *
 **/
-void harris_measure(
-  float *A,   //upper-left coefficient of the Autocorrelation matrix
-  float *B,   //symmetric coefficient of the Autocorrelation matrix
-  float *C,   //bottom-right coefficient of the Autocorrelation matrix
-  float *Mc,  //Harris measure function
-  int   nx,   //number of columns of the image
-  int   ny,   //number of rows of the image
-  float k,    //Harris coefficient for the measure function
-  float &max, //output max value
-  float &min  //output min value
+void compute_autocorrelation_matrix(
+  float *Ix,   //gradient of the image
+  float *Iy,   //gradient of the image
+  float *A,    //upper-left coefficient of the Autocorrelation matrix
+  float *B,    //symmetric coefficient of the Autocorrelation matrix
+  float *C,    //bottom-right coefficient of the Autocorrelation matrix
+  float sigma, //standard deviation for smoothing (pixel neighbourhood)
+  int   nx,    //number of columns of the image
+  int   ny     //number of rows of the image
 )
 {
+#pragma omp parallel for
   for (int i=0;i<nx*ny;i++)
   {
-      float detA   = A[i]*C[i] - B[i]*B[i];
-      float traceA = A[i] + C[i];
-
-      Mc[i] = detA - k*traceA*traceA;
-      
-      if (Mc[i] > max)  max = Mc[i];
-      if (Mc[i] < min)  min = Mc[i];
+     A[i] = Ix[i]*Ix[i];
+     B[i] = Ix[i]*Iy[i];
+     C[i] = Iy[i]*Iy[i];
   }
-}
+
+  gaussian_sii(A, nx, ny, sigma);
+  gaussian_sii(B, nx, ny, sigma);
+  gaussian_sii(C, nx, ny, sigma);
+} 
 
 
 /**
   *
-  * Function for computing harmonic mean measure
+  * Function for computing Harris' discriminant function
   *
 **/
-void harmonic_mean_measure(
-  float *A,   //upper-left coefficient of the Autocorrelation matrix
-  float *B,   //symmetric coefficient of the Autocorrelation matrix
-  float *C,   //bottom-right coefficient of the Autocorrelation matrix
-  float *Mc,  //Harris measure function
-  int   nx,   //number of columns of the image
-  int   ny,   //number of rows of the image
-  float &max, //output max value
-  float &min  //output min value
+void compute_discriminant_function(
+  float *A,      //upper-left coefficient of the Autocorrelation matrix
+  float *B,      //symmetric coefficient of the Autocorrelation matrix
+  float *C,      //bottom-right coefficient of the Autocorrelation matrix
+  float *Mc,     //Harris measure
+  int   measure, //measure strategy
+  int   nx,      //number of columns of the image
+  int   ny,      //number of rows of the image
+  float k,       //Harris coefficient for the measure function
+  float &max,    //output max value
+  float &min     //output min value
 )
 {
-  for (int i=0;i<nx*ny;i++)
+  int size = nx*ny;
+
+  //compute the discriminant function following one strategy
+  switch(measure) 
   {
-      float detA   = A[i]*C[i]-B[i]*B[i];
-      float traceA = A[i]+C[i];
+    default: case HARRIS_MEASURE:
+      for (int i=0; i<size; i++)
+      {
+        float detA   = A[i]*C[i] - B[i]*B[i];
+        float traceA = A[i] + C[i];
 
-      Mc[i] = 2*detA / (traceA+0.0001);
+        Mc[i] = detA - k*traceA*traceA;
 
-      if (Mc[i]>max)  max = Mc[i];
-      if (Mc[i]<min)  min = Mc[i];
-  }
-}
+        if(Mc[i]>max) max=Mc[i];
+        if(Mc[i]<min) min=Mc[i];
+      }
 
+    case HARMONIC_MEAN_MEASURE: 
+      for (int i=0; i<size; i++)
+      {
+        float detA  =A[i]*C[i]-B[i]*B[i];
+        float traceA=A[i]+C[i];
 
-/**
-  *
-  * Function for computing Shi-Tomasi measure
-  *
-**/
-void shi_tomasi_measure(
-  float *A,   //upper-left coefficient of the Autocorrelation matrix
-  float *B,   //symmetric coefficient of the Autocorrelation matrix
-  float *C,   //bottom-right coefficient of the Autocorrelation matrix
-  float *Mc,  //Harris measure function
-  int   nx,   //number of columns of the image
-  int   ny,   //number of rows of the image
-  float th,   //Shi-Tomasi threshold for the minimum eigenvalue
-  float &max, //output max value
-  float &min  //output min value
-)
-{
-  for (int i=0;i<nx*ny;i++)
-  {
-      float D = sqrt(A[i]*A[i]-2*A[i]*C[i]+4*B[i]*B[i]+C[i]*C[i]);
-      float lmin = 0.5*(A[i]+C[i])-0.5*D;
+        Mc[i]=2*detA/(traceA+0.0001);
 
-      if(lmin>th)
-        Mc[i]=lmin;
-      else
-	Mc[i]=0;
+        if(Mc[i]>max) max=Mc[i];
+        if(Mc[i]<min) min=Mc[i];
+      }
+      break;
 
-      if (Mc[i]>max)  max = Mc[i];
-      if (Mc[i]<min)  min = Mc[i];
+    case SHI_TOMASI_MEASURE:
+      for (int i=0; i<size; i++)
+      {
+        float D = sqrt(A[i]*A[i]-2*A[i]*C[i]+4*B[i]*B[i]+C[i]*C[i]);
+        float lmin = 0.5*(A[i]+C[i])-0.5*D;
+
+        if(lmin>k)
+          Mc[i]=lmin;
+        else
+          Mc[i]=0;
+
+        if(Mc[i]>max) max=Mc[i];
+        if(Mc[i]<min) min=Mc[i];
+      }
+     break;
   }
 }
 
@@ -130,55 +134,55 @@ void shi_tomasi_measure(
   * for non-maximum_suppression
   *
 **/
-void spiral_order(
-  int *index,
-  int radius,
-  int nx,
-  int bruteforce=0
-)
-{
-  int size=(2*radius+1)*(2*radius+1)-2*radius-1;
-  
-  int x=1, y=1;    //initial position
-  int dx=-1, dy=0; //iterative increment
-  int c=2;         //number of positions per branch
-  int d=0;         //directions: 0-left; 1-up; 2-right; 3-down
-  
-  //the first position is the botton-right corner
-  index[0]=y*nx+x;
-  
-  int i=1;
-  while(i<size)
-  {
-    //process following line
-    for(int j=0; j<c && i<size; j++)
-    {
-      //next position in the line
-      x+=dx; y+=dy;
-      
-      //do not include the central line in the index
-      if(y!=0 || bruteforce) 
-      {
-        index[i]=y*nx+x;
-        i++;
-      }
-    }    
-        
-    //change direction
-    d=(d+1)%4;
-    switch(d)
-    {
-      case 0: dx=-1; dy=0;  break;
-      case 1: dx=0;  dy=-1; break;
-      case 2: dx=1;  dy=0;  break;
-      case 3: dx=0;  dy=1;  break;  
-    }
-    
-    //increase traverse
-    if(d==0 || d==2) 
-      c++;
-  }
-}
+// void spiral_order(
+//   int *index,
+//   int radius,
+//   int nx,
+//   int bruteforce=0
+// )
+// {
+//   int size=(2*radius+1)*(2*radius+1)-2*radius-1;
+//   
+//   int x=1, y=1;    //initial position
+//   int dx=-1, dy=0; //iterative increment
+//   int c=2;         //number of positions per branch
+//   int d=0;         //directions: 0-left; 1-up; 2-right; 3-down
+//   
+//   //the first position is the botton-right corner
+//   index[0]=y*nx+x;
+//   
+//   int i=1;
+//   while(i<size)
+//   {
+//     //process following line
+//     for(int j=0; j<c && i<size; j++)
+//     {
+//       //next position in the line
+//       x+=dx; y+=dy;
+//       
+//       //do not include the central line in the index
+//       if(y!=0 || bruteforce) 
+//       {
+//         index[i]=y*nx+x;
+//         i++;
+//       }
+//     }    
+//         
+//     //change direction
+//     d=(d+1)%4;
+//     switch(d)
+//     {
+//       case 0: dx=-1; dy=0;  break;
+//       case 1: dx=0;  dy=-1; break;
+//       case 2: dx=1;  dy=0;  break;
+//       case 3: dx=0;  dy=1;  break;  
+//     }
+//     
+//     //increase traverse
+//     if(d==0 || d==2) 
+//       c++;
+//   }
+// }
 
 
 //#define BRUTEFORCE
@@ -199,40 +203,40 @@ void non_maximum_suppression(
 )
 {
 
-#ifdef BRUTEFORCE
-  
-  for(int i=radius; i<ny-radius; i++)
-  {
-    for(int j=radius; j<nx-radius; j++)
-    {
-      int k=i-radius; 
-      bool found=false;
-      while(!found && k<=i+radius)
-      {
-        int l=j-radius;
-        while(!found && l<=j+radius)
-        {
-          if(I[k*nx+l]>I[i*nx+j])
-            found=true;
-          l++;
-        }
-        k++;
-      }
-      
-      //if we found a local maximum add to the list
-      if(!found) 
-        corners.push_back({(float)j,(float)i,I[i*nx+j]});
-    }
-  }
-
-#else
+// #ifdef BRUTEFORCE
+//   
+//   for(int i=radius; i<ny-radius; i++)
+//   {
+//     for(int j=radius; j<nx-radius; j++)
+//     {
+//       int k=i-radius; 
+//       bool found=false;
+//       while(!found && k<=i+radius)
+//       {
+//         int l=j-radius;
+//         while(!found && l<=j+radius)
+//         {
+//           if(I[k*nx+l]>I[i*nx+j])
+//             found=true;
+//           l++;
+//         }
+//         k++;
+//       }
+//       
+//       //if we found a local maximum add to the list
+//       if(!found) 
+//         corners.push_back({(float)j,(float)i,I[i*nx+j],0});
+//     }
+//   }
+// 
+// #else
 
   int *skip  = new int[nx*ny]();
   int size   = (2*radius+1)*(2*radius+1)-2*radius-1;
-  int *index = new int[size];
+  //int *index = new int[size];
 
   //create the spiral order index
-  spiral_order(index, radius, nx);
+ // spiral_order(index, radius, nx);
 
 //#pragma omp parallel for
   for(int i=radius; i<ny-radius; i++)
@@ -269,20 +273,20 @@ void non_maximum_suppression(
   
           if(p2<j-radius)
           {
-#ifdef SPIRAL_TEST
-            //spiral order test
-            int s=0;
-            while(s<size && I[i*nx+j+index[s]]<I[i*nx+j])
-            {
-              //if(i*nx+j+index[s]>i*nx+j)
-              skip[i*nx+j+index[s]]=1;
-              s++;	       
-            }
-
-            //new local maximum found
-            if(s>=size) 
-              corners.push_back({(float)j,(float)i,I[i*nx+j]});
-#else
+// #ifdef SPIRAL_TEST
+//             //spiral order test
+//             int s=0;
+//             while(s<size && I[i*nx+j+index[s]]<I[i*nx+j])
+//             {
+//               //if(i*nx+j+index[s]>i*nx+j)
+//               skip[i*nx+j+index[s]]=1;
+//               s++;	       
+//             }
+// 
+//             //new local maximum found
+//             if(s>=size) 
+//               corners.push_back({(float)j,(float)i,I[i*nx+j],0});
+// #else
             int k=i+radius; 
             bool found=false;
             while(!found && k>i)
@@ -313,8 +317,8 @@ void non_maximum_suppression(
             }
             
             if(!found) 
-              corners.push_back({(float)j,(float)i,I[i*nx+j]});
-#endif
+              corners.push_back({(float)j,(float)i,I[i*nx+j],0});
+// #endif
 	  }
           j++;
         }
@@ -324,9 +328,9 @@ void non_maximum_suppression(
   }
   
   delete []skip;
-  delete []index;
+  //delete []index;
 
-#endif
+//#endif
 }
 
 
@@ -361,21 +365,76 @@ void subpixel_precision(
     M[6]=Mc[dy*nx+mx];
     M[7]=Mc[dy*nx+(int)x];
     M[8]=Mc[dy*nx+dx];
-
-    //printf(" Subpixel precision (%f, %f) => ",x[i],y[i]);
-    //calculate the maximum of the quadratic interpolation
+    
+    corners[i].Mcint=corners[i].Mc;
     maximum_interpolation(M, corners[i]);
-    //printf("(%f, %f)\n",x[i],y[i]);
-  }
-    
+  }   
 }
-    
 
-//#define GAUSSIAN_LUIS
-  
+
 /**
   *
-  * Function for computing Harris corners
+  * Function for selecting the output corners
+  *
+**/    
+void select_output_corners(
+  vector<harris_corner> &corners, // output selected corners
+  int select_strategy, // strategy for the output corners
+  int cells,           // number of regions in the image for distributed output
+  int Nselect,         // number of output corners
+  int nx,              // number of columns of the image
+  int ny               // number of rows of the image
+)
+{
+  switch(select_strategy) 
+  {
+    default: case ALL_CORNERS: 
+      break;
+
+    case ALL_CORNERS_SORTED:
+      sort(corners.begin(), corners.end());
+      break;
+
+    case N_CORNERS:
+      sort(corners.begin(), corners.end());
+      corners.erase(corners.begin()+Nselect, corners.end());
+      break;
+
+    case DISTRIBUTED_N_CORNERS:
+      int size=cells*cells;
+      int Ncell=Nselect/size;
+      vector<vector<harris_corner>> cell_corners(size);
+
+      //distribute corners in the cells
+      int Dx=nx/cells;
+      int Dy=ny/cells;
+      for(unsigned int i=0; i<corners.size(); i++)
+      {
+        int px=corners[i].x/Dx;
+        int py=corners[i].y/Dy;
+
+        cell_corners[py*cells+px].push_back(corners[i]);
+      }
+
+      //sort the corners in each cell
+      for(int i=0; i<size; i++)
+        sort(cell_corners[i].begin(), cell_corners[i].end());
+
+      //copy the Ncell first corners to the output array
+      corners.resize(0);
+      for(int i=0; i<size; i++)
+        corners.insert(
+          corners.end(), cell_corners[i].begin(), 
+          cell_corners[i].begin()+Ncell
+        );
+      break;
+  }
+}
+
+
+/**
+  *
+  * Main function for computing Harris corners
   *
 **/
 void harris(
@@ -387,12 +446,12 @@ void harris(
   float sigma_n,    // standard deviation for smoothing (pixel neighbourhood)
   int   radius,     // radius of the autocorralation matrix
   int   select_strategy, // strategy for the output corners
+  int   cells,      // number of regions in the image for distributed output
   int   Nselect,    // number of output corners
   int   precision,  // enable subpixel precision
   int   nx,         // number of columns of the image
   int   ny,         // number of rows of the image
-  int   verbose,    // activate verbose mode
-  int   forensics   // activate forensics mode  
+  int   verbose     // activate verbose mode
 )
 {
   int size=nx*ny;
@@ -402,37 +461,29 @@ void harris(
 
   struct timeval start, end;
   
-  //smooth the original image
   if (verbose)
   {
      printf("Harris corner detection:\n");
-     printf(" 1.Convolving image with a Gaussian function\n");
+     printf(" 1.Convolving image with Gaussian (sigma=%f)\n", sigma_i);
     
      gettimeofday(&start, NULL);    
   }
 
-#ifdef GAUSSIAN_LUIS
-  gaussian(I, nx, ny, sigma_i);
-#else
+  //smooth the original image to reduce noise
   gaussian_sii(I, nx, ny, sigma_i);
-#endif
 
   if (verbose)
   {  
      gettimeofday(&end, NULL);
      printf("\n Time: %fs\n", ((end.tv_sec-start.tv_sec)* 1000000u + 
             end.tv_usec - start.tv_usec) / 1.e6);
-  }
 
-  
-  //compute the gradient of the image
-  if (verbose) 
-  {
      printf(" 2.Computing the gradient of the image\n");
   
      gettimeofday(&start, NULL);
   }
   
+  //compute the gradient of the image
   gradient(I, Ix, Iy, nx, ny);
 
   if (verbose) 
@@ -440,10 +491,7 @@ void harris(
      gettimeofday(&end, NULL);
      printf("\n Time: %fs\n", ((end.tv_sec-start.tv_sec)* 1000000u + 
             end.tv_usec - start.tv_usec) / 1.e6);
-  }
 
-  if (forensics)
-  {
      printf("  -Saving Is.png, Ix.png, Iy.png\n");
 
      char name1[200]="Is.png";
@@ -452,37 +500,19 @@ void harris(
      iio_save_image_float_vec(name1, I, nx, ny, 1);
      iio_save_image_float_vec(name2, Ix, nx, ny, 1);
      iio_save_image_float_vec(name3, Iy, nx, ny, 1);
-  }
 
-  //compute the Harris function in each pixel
-  if (verbose) 
-  {
      printf(" 3.Computing the Harris' Mc function \n");
 
      gettimeofday(&start, NULL);
   }
 
+  //variables for the Autocorrelation matrix
   float *A = new float[size];
   float *B = new float[size];
   float *C = new float[size];
 
-  #pragma omp parallel for
-  for (int i=0;i<size;i++)
-  {
-     A[i] = Ix[i]*Ix[i];
-     B[i] = Ix[i]*Iy[i];
-     C[i] = Iy[i]*Iy[i];
-  }
-
-#ifdef GAUSSIAN_LUIS
-  gaussian(A, nx, ny, sigma_n);
-  gaussian(B, nx, ny, sigma_n);
-  gaussian(C, nx, ny, sigma_n);
-#else
-  gaussian_sii(A, nx, ny, sigma_n);
-  gaussian_sii(B, nx, ny, sigma_n);
-  gaussian_sii(C, nx, ny, sigma_n);
-#endif
+  //compute the Autocorrelation matrix
+  compute_autocorrelation_matrix(Ix, Iy, A, B, C, sigma_n, nx, ny);
   
   if (verbose) 
   {  
@@ -494,26 +524,12 @@ void harris(
     gettimeofday(&start, NULL);     
   }
 
-  float max = FLT_MIN;
-  float min = FLT_MAX;
-
-  //compute the discriminant function following one strategy
-  switch(measure) {
-    case HARMONIC_MEAN_MEASURE: 
-      if(verbose)
-        printf("   Harmonic mean measure\n");
-      harmonic_mean_measure(A, B, C, Mc, nx, ny, max, min);
-      break;
-    case SHI_TOMASI_MEASURE:
-      if(verbose)
-        printf("   Shi-Tomasi measure\n");
-     shi_tomasi_measure(A, B, C, Mc, nx, ny, k, max, min);
-     break;
-    default:
-      if(verbose)
-        printf("   Harris measure\n");
-      harris_measure(A, B, C, Mc, nx, ny, k, max, min);
-  }
+  float max  = FLT_MIN;
+  float min  = FLT_MAX;
+  
+  //compute the discriminant function following one strategy 
+  //Harris, Shi-Tomasi, Harmonic mean
+  compute_discriminant_function(A, B, C, Mc, measure, nx, ny, k, max, min);
 
   if (verbose) 
   {
@@ -524,14 +540,13 @@ void harris(
      printf("  -Mc max=%f, Mc min=%f\n",max, min);     
   }
 
-  // Non-maximum suppression
   if (verbose) 
   {
      printf("\n 5.Non-maximum suppression\n");
      gettimeofday(&start, NULL);     
   }
 
-  corners.reserve(1000);
+  //select corners with non-maximum suppression 
   non_maximum_suppression(Mc, corners, radius, nx, ny, verbose);
 
   if (verbose) 
@@ -541,24 +556,23 @@ void harris(
             end.tv_usec - start.tv_usec) / 1.e6);
   }
 
-
-  //Select output corners depending on the strategy
-  switch(select_strategy) {
-    case ALL_CORNERS:
-      sort(corners.begin(), corners.end());
-      break;
-    case N_CORNERS:
-      sort(corners.begin(), corners.end());
-      corners.erase(corners.begin()+Nselect, corners.end());
-      break;
-    case DISTRIBUTED_N_CORNERS:
-      sort(corners.begin(), corners.end());
-      corners.erase(corners.begin()+Nselect, corners.end());
-      break;
+  if (verbose) 
+  {
+     printf("\n 6.Selecting output corners\n");
+     gettimeofday(&start, NULL);     
+  }
+  
+  //select output corners depending on the strategy
+  //all corners; all corners sorted; N corners; distributed corners
+  select_output_corners(corners, select_strategy, cells, Nselect, nx, ny);
+  
+  if (verbose) 
+  {
+     gettimeofday(&end, NULL);
+     printf("Time: %fs\n", ((end.tv_sec-start.tv_sec)* 1000000u + 
+            end.tv_usec - start.tv_usec) / 1.e6);
   }
 
-
-  //compute subpixel precision through quadratic interpolation
   if(precision)
   {
     if (verbose)
@@ -567,6 +581,7 @@ void harris(
        gettimeofday(&start, NULL);
     }
 
+    //compute subpixel precision through quadratic interpolation
     subpixel_precision(Mc, corners, nx);
 
     if (verbose)
@@ -577,7 +592,7 @@ void harris(
     }
   }
 
-  if(forensics)
+  if(verbose)
   {
     printf("  -Number of detected corner points: %ld\n", corners.size());
     printf("  -Saving Mc.png \n");
