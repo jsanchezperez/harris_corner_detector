@@ -95,6 +95,7 @@ void compute_discriminant_function(
         if(Mc[i]>max) max=Mc[i];
         if(Mc[i]<min) min=Mc[i];
       }
+      break;
 
     case HARMONIC_MEAN_MEASURE: 
       for (int i=0; i<size; i++)
