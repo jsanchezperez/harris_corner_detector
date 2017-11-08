@@ -1,11 +1,9 @@
 #include "interpolation.h"
 
-#define MAX_ITERATIONS 100
-
-
-#include "harris.h"
-
 #include <stdio.h>
+
+
+#define MAX_ITERATIONS 100
 
 /**
   *
@@ -16,9 +14,9 @@
   *
 **/
 float f(
-  float *a,
-  float x,
-  float y
+  float *a, //polynomial coefficients
+  float x,  //x value
+  float y   //y value
 )
 {
   return a[0]*x*x*y*y+a[1]*x*x*y+a[2]*x*y*y+
@@ -35,8 +33,8 @@ float f(
   *
 **/
 void polynomial_coefficients(
-  float *M,
-  float *a
+  float *M, //values of the interpolation function
+  float *a  //output polynomial coefficients
 )
 {
   a[0]=M[4]-0.5*(M[1]+M[3]+M[5]+M[7])+0.25*(M[0]+M[2]+M[6]+M[8]);
@@ -118,9 +116,11 @@ bool solve(
   *
 **/
 bool maximum_interpolation(
-  float *M, //values of the surfare (9 values)
-  harris_corner &corner, //corner
-  float TOL //stopping criterion threshold
+  float *M,  //values of the interpolation function (9 values)
+  float &x,  //corner x-position
+  float &y,  //corner y-position
+  float &Mo, //maximum of the interpolation function
+  float TOL  //stopping criterion threshold
 )
 {
   float D[2],b[2],H[3],a[9];
@@ -146,8 +146,6 @@ bool maximum_interpolation(
     i++;
   }
   while(D[0]*D[0]+D[1]*D[1]>TOL && i<MAX_ITERATIONS);
-    
-  //printf("Iterations> %d  increment: (%f, %f)\n", i, dx, dy);
   
   //check that (dx, dy) are inside the allowed boundaries 
   if(dx>1 || dx<-1 || dy>1 || dy<-1)
@@ -155,8 +153,7 @@ bool maximum_interpolation(
   else
   {
     //compute the new position and value
-    corner.x+=dx; corner.y+=dy;
-    corner.Mc=f(a, corner.x, corner.y);
+    x+=dx; y+=dy; Mo=f(a, dx, dy);
     return true;
   }
 }

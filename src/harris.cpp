@@ -14,9 +14,7 @@ extern "C"
 #include "gaussian.h"
 #include "interpolation.h"
 
-
 using namespace std;
-
 
 /**
   *
@@ -26,7 +24,8 @@ using namespace std;
 bool operator<(
   const harris_corner &c1, 
   const harris_corner &c2
-) {
+) 
+{
   return c1.Mc > c2.Mc;
 }
 
@@ -75,6 +74,7 @@ void compute_discriminant_function(
   int   nx,      //number of columns of the image
   int   ny,      //number of rows of the image
   float k,       //Harris coefficient for the measure function
+  float Th,      //threshold for eliminating low values
   float &max,    //output max value
   float &min     //output min value
 )
@@ -115,7 +115,7 @@ void compute_discriminant_function(
         float D = sqrt(A[i]*A[i]-2*A[i]*C[i]+4*B[i]*B[i]+C[i]*C[i]);
         float lmin = 0.5*(A[i]+C[i])-0.5*D;
 
-        if(lmin>k)
+        if(lmin>Th)
           Mc[i]=lmin;
         else
           Mc[i]=0;
@@ -225,7 +225,7 @@ void non_maximum_suppression(
 //       
 //       //if we found a local maximum add to the list
 //       if(!found) 
-//         corners.push_back({(float)j,(float)i,I[i*nx+j],0});
+//         corners.push_back({(float)j, (float)i, I[i*nx+j]});
 //     }
 //   }
 // 
@@ -285,7 +285,7 @@ void non_maximum_suppression(
 // 
 //             //new local maximum found
 //             if(s>=size) 
-//               corners.push_back({(float)j,(float)i,I[i*nx+j],0});
+//               corners.push_back({(float)j, (float)i, I[i*nx+j]});
 // #else
             int k=i+radius; 
             bool found=false;
@@ -317,7 +317,7 @@ void non_maximum_suppression(
             }
             
             if(!found) 
-              corners.push_back({(float)j,(float)i,I[i*nx+j],0});
+              corners.push_back({(float)j, (float)i, I[i*nx+j]});
 // #endif
 	  }
           j++;
@@ -333,45 +333,6 @@ void non_maximum_suppression(
 //#endif
 }
 
-
-/**
-  *
-  * Function for computing subpixel precision of maxima
-  *
-**/
-void subpixel_precision(
-  float *Mc,  // discriminant function
-  vector<harris_corner> &corners, // selected corners
-  int nx
-)
-{
-  for(unsigned int i=0; i<corners.size(); i++)
-  {
-    const float x=corners[i].x;
-    const float y=corners[i].y;
-   
-    int mx=x-1;
-    int dx=x+1;
-    int my=y-1;
-    int dy=y+1;
-    
-    float M[9];
-    M[0]=Mc[my*nx+mx];
-    M[1]=Mc[my*nx+(int)x];
-    M[2]=Mc[my*nx+dx];
-    M[3]=Mc[(int)y*nx+mx];
-    M[4]=Mc[(int)y*nx+(int)x];
-    M[5]=Mc[(int)y*nx+dx];
-    M[6]=Mc[dy*nx+mx];
-    M[7]=Mc[dy*nx+(int)x];
-    M[8]=Mc[dy*nx+dx];
-    
-    corners[i].Mcint=corners[i].Mc;
-    maximum_interpolation(M, corners[i]);
-  }   
-}
-
-
 /**
   *
   * Function for selecting the output corners
@@ -379,14 +340,14 @@ void subpixel_precision(
 **/    
 void select_output_corners(
   vector<harris_corner> &corners, // output selected corners
-  int select_strategy, // strategy for the output corners
+  int strategy, // strategy for the output corners
   int cells,           // number of regions in the image for distributed output
   int Nselect,         // number of output corners
   int nx,              // number of columns of the image
   int ny               // number of rows of the image
 )
 {
-  switch(select_strategy) 
+  switch(strategy) 
   {
     default: case ALL_CORNERS: 
       break;
@@ -434,24 +395,61 @@ void select_output_corners(
 
 /**
   *
+  * Function for computing subpixel precision of maxima
+  *
+**/
+void subpixel_precision(
+  float *Mc,  // discriminant function
+  vector<harris_corner> &corners, // selected corners
+  int nx
+)
+{
+  for(unsigned int i=0; i<corners.size(); i++)
+  {
+    const float x=corners[i].x;
+    const float y=corners[i].y;
+   
+    int mx=x-1;
+    int dx=x+1;
+    int my=y-1;
+    int dy=y+1;
+    
+    float M[9];
+    M[0]=Mc[my*nx+mx];
+    M[1]=Mc[my*nx+(int)x];
+    M[2]=Mc[my*nx+dx];
+    M[3]=Mc[(int)y*nx+mx];
+    M[4]=Mc[(int)y*nx+(int)x];
+    M[5]=Mc[(int)y*nx+dx];
+    M[6]=Mc[dy*nx+mx];
+    M[7]=Mc[dy*nx+(int)x];
+    M[8]=Mc[dy*nx+dx];
+    
+    maximum_interpolation(M, corners[i].x, corners[i].y, corners[i].Mc);
+  }   
+}
+
+
+/**
+  *
   * Main function for computing Harris corners
   *
 **/
 void harris(
-  float *I,         // input image
+  float *I,        // input image
   vector<harris_corner> &corners, // output selected corners
-  int   measure,    // measure for the discriminant function
-  float k,          // Harris constant for the ....function
-  float sigma_i,    // standard deviation for smoothing (image denoising)    
-  float sigma_n,    // standard deviation for smoothing (pixel neighbourhood)
-  int   radius,     // radius of the autocorralation matrix
-  int   select_strategy, // strategy for the output corners
-  int   cells,      // number of regions in the image for distributed output
-  int   Nselect,    // number of output corners
-  int   precision,  // enable subpixel precision
-  int   nx,         // number of columns of the image
-  int   ny,         // number of rows of the image
-  int   verbose     // activate verbose mode
+  int   measure,   // measure for the discriminant function
+  float k,         // Harris constant for the ....function
+  float sigma_i,   // standard deviation for smoothing (image denoising)    
+  float sigma_n,   // standard deviation for smoothing (pixel neighbourhood)
+  float Th,        // threshold for eliminating low values
+  int   strategy,  // strategy for the output corners
+  int   cells,     // number of regions in the image for distributed output
+  int   Nselect,   // number of output corners
+  int   precision, // enable subpixel precision
+  int   nx,        // number of columns of the image
+  int   ny,        // number of rows of the image
+  int   verbose    // activate verbose mode
 )
 {
   int size=nx*ny;
@@ -501,7 +499,7 @@ void harris(
      iio_save_image_float_vec(name2, Ix, nx, ny, 1);
      iio_save_image_float_vec(name3, Iy, nx, ny, 1);
 
-     printf(" 3.Computing the Harris' Mc function \n");
+     printf(" 3.Computing the Autocorrelation matrix \n");
 
      gettimeofday(&start, NULL);
   }
@@ -520,7 +518,7 @@ void harris(
      printf("\n Time: %fs\n", ((end.tv_sec-start.tv_sec)* 1000000u + 
             end.tv_usec - start.tv_usec) / 1.e6);
 
-    printf(" 4.Computing one of the measures (0.Harris, 1.Shi-Tomasi, 2.Szeliski): %d\n", measure);
+    printf(" 4.Computing the discriminant function (0.Harris, 1.Shi-Tomasi, 2.Szeliski): %d\n", measure);
     gettimeofday(&start, NULL);     
   }
 
@@ -529,7 +527,7 @@ void harris(
 
   //compute the discriminant function following one strategy 
   //Harris, Shi-Tomasi, Harmonic mean
-  compute_discriminant_function(A, B, C, Mc, measure, nx, ny, k, max, min);
+  compute_discriminant_function(A, B, C, Mc, measure, nx, ny, k, Th, max, min);
 
   if (verbose) 
   {
@@ -538,15 +536,30 @@ void harris(
             end.tv_usec - start.tv_usec) / 1.e6);
      
      printf("  -Mc max=%f, Mc min=%f\n",max, min);     
+     
+     printf("\n 5.Apply threshold\n");
+     gettimeofday(&start, NULL);     
   }
-
+  
+  
+  //apply threshold to eliminate low values
+  if(measure!=SHI_TOMASI_MEASURE)
+    for(int i=0; i<size; i++)
+      if(Mc[i]<Th) Mc[i]=0;
+    
+      
   if (verbose) 
   {
-     printf("\n 5.Non-maximum suppression\n");
+     gettimeofday(&end, NULL);
+     printf("Time: %fs\n", ((end.tv_sec-start.tv_sec)* 1000000u + 
+            end.tv_usec - start.tv_usec) / 1.e6);
+     
+     printf("\n 6.Non-maximum suppression\n");
      gettimeofday(&start, NULL);     
   }
 
-  //select corners with non-maximum suppression 
+  //apply non-maximum suppression to select salient corners
+  int radius=2*sigma_n;
   non_maximum_suppression(Mc, corners, radius, nx, ny, verbose);
 
   if (verbose) 
@@ -558,13 +571,13 @@ void harris(
 
   if (verbose) 
   {
-     printf("\n 6.Selecting output corners\n");
+     printf("\n 7.Selecting output corners\n");
      gettimeofday(&start, NULL);     
   }
 
   //select output corners depending on the strategy
   //all corners; all corners sorted; N corners; distributed corners
-  select_output_corners(corners, select_strategy, cells, Nselect, nx, ny);
+  select_output_corners(corners, strategy, cells, Nselect, nx, ny);
 
   if (verbose) 
   {
@@ -577,7 +590,7 @@ void harris(
   {
     if (verbose)
     {
-       printf("\n 6.Computing subpixel precision\n");
+       printf("\n 8.Computing subpixel precision\n");
        gettimeofday(&start, NULL);
     }
 

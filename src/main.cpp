@@ -15,7 +15,7 @@ extern "C"
 #define PAR_DEFAULT_K 0.06
 #define PAR_DEFAULT_SIGMA_I 1.0
 #define PAR_DEFAULT_SIGMA_N 2.5
-#define PAR_DEFAULT_RADIUS 5
+#define PAR_DEFAULT_THRESHOLD 10
 #define PAR_DEFAULT_MEASURE HARRIS_MEASURE
 #define PAR_DEFAULT_SELECT_STRATEGY ALL_CORNERS
 #define PAR_DEFAULT_CELLS 1
@@ -49,8 +49,8 @@ void print_help(char *name)
   printf("              default value %f\n", PAR_DEFAULT_SIGMA_I);    
   printf("   -s N     Gauss standard deviation for weighted windows\n");
   printf("              default value %f\n", PAR_DEFAULT_SIGMA_N);
-  printf("   -w N     window radius size\n");
-  printf("              default value %d\n", PAR_DEFAULT_RADIUS);
+  printf("   -t N     threshold for eliminating low values\n");
+  printf("              default value %d\n", PAR_DEFAULT_THRESHOLD);
   printf("   -q N     strategy for selecting the output corners:\n");
   printf("              0.All corners; 1.Sort all corners;\n");
   printf("              2.N corners; 3.Distributed N corners\n");
@@ -79,8 +79,8 @@ int read_parameters(
   float &k,
   float &sigma_i,  
   float &sigma_n,
-  int   &radius,
-  int   &select_strategy,
+  float &threshold,
+  int   &strategy,
   int   &cells,
   int   &Nselect,
   int   &subpixel_precision,  
@@ -100,8 +100,8 @@ int read_parameters(
     sigma_i=PAR_DEFAULT_SIGMA_I;    
     sigma_n=PAR_DEFAULT_SIGMA_N;
     measure=PAR_DEFAULT_MEASURE;
-    radius=PAR_DEFAULT_RADIUS;
-    select_strategy=PAR_DEFAULT_SELECT_STRATEGY;
+    threshold=PAR_DEFAULT_THRESHOLD;
+    strategy=PAR_DEFAULT_SELECT_STRATEGY;
     cells=PAR_DEFAULT_CELLS;
     Nselect=PAR_DEFAULT_NSELECT;
     subpixel_precision=PAR_DEFAULT_SUBPIXEL_PRECISION;
@@ -133,18 +133,18 @@ int read_parameters(
         if(i<argc-1)
           sigma_n=atof(argv[++i]);
         
-      if(strcmp(argv[i],"-w")==0)
+      if(strcmp(argv[i],"-t")==0)
         if(i<argc-1)
-          radius=atoi(argv[++i]);
+          threshold=atof(argv[++i]);
 
       if(strcmp(argv[i],"-q")==0)
         if(i<argc-1)
-          select_strategy=atoi(argv[++i]);
-	
+          strategy=atoi(argv[++i]);
+
       if(strcmp(argv[i],"-c")==0)
         if(i<argc-1)
           cells=atoi(argv[++i]);
-	
+
       if(strcmp(argv[i],"-N")==0)
         if(i<argc-1)
           Nselect=atoi(argv[++i]);
@@ -154,7 +154,7 @@ int read_parameters(
 
       if(strcmp(argv[i],"-v")==0)
         verbose=1;
-      
+
       i++;
     }
 
@@ -162,7 +162,6 @@ int read_parameters(
     if(k<=0)      k       = PAR_DEFAULT_K;
     if(sigma_i<0) sigma_i = PAR_DEFAULT_SIGMA_I;
     if(sigma_n<0) sigma_n = PAR_DEFAULT_SIGMA_N;
-    if(radius<1)  radius  = PAR_DEFAULT_RADIUS;    
     if(cells<0)   cells   = PAR_DEFAULT_CELLS;
     if(Nselect<1) Nselect = PAR_DEFAULT_NSELECT;
   }
@@ -174,7 +173,7 @@ int read_parameters(
 
 /**
  *
- *  Draw the Harris' corners and the cells on the image
+ *  Draw the Harris' corners and division cells on the image
  *
  */
 void draw_points(
@@ -265,7 +264,7 @@ void draw_points(
   * 
 **/
 void rgb2gray(
-  float *rgb, //input color image
+  float *rgb,  //input color image
   float *gray, //output grayscale image
   int size     //number of pixels
 )
@@ -285,14 +284,14 @@ int main(int argc, char *argv[])
 {
   //parameters of the method
   char  *image, *out_image=NULL, *out_file=NULL;
-  float k, sigma_i, sigma_n;
-  int   select_strategy, Nselect, radius, measure;
+  float k, sigma_i, sigma_n, threshold;
+  int   strategy, Nselect, measure;
   int   subpixel_precision, cells, verbose;
 
   //read the parameters from the console
   int result=read_parameters(
         argc, argv, &image, &out_image, &out_file, 
-        measure, k, sigma_i, sigma_n, radius, select_strategy, 
+        measure, k, sigma_i, sigma_n, threshold, strategy, 
         cells, Nselect, subpixel_precision, verbose
       );
 
@@ -305,11 +304,11 @@ int main(int argc, char *argv[])
       printf(
         "Parameters:\n"
         "  Input image: '%s', Output image: '%s', Output corner file: %s\n"
-        "  measure: %d, K: %f, Sigma_i: %f, Sigma_n: %f, Window radius: %d, \n"
+        "  measure: %d, K: %f, Sigma_i: %f, Sigma_n: %f, Threshold: %f, \n"
         "  Select strategy: %d, Number of cells: %d, Nselect: %d, \n"
         "  nx: %d, ny: %d, nz: %d\n",
-        image, out_image, out_file,  measure, k, sigma_i, sigma_n, radius, 
-        select_strategy, cells, Nselect, nx, ny, nz
+        image, out_image, out_file,  measure, k, sigma_i, sigma_n, 
+        threshold, strategy, cells, Nselect, nx, ny, nz
       );
 
     if (Ic!=NULL)
@@ -330,7 +329,7 @@ int main(int argc, char *argv[])
 
       //compute Harris' corners
       harris(
-        I, corners, measure, k, sigma_i, sigma_n, radius, select_strategy,
+        I, corners, measure, k, sigma_i, sigma_n, threshold, strategy,
         cells, Nselect, subpixel_precision, nx, ny, verbose
       );
 
@@ -344,7 +343,7 @@ int main(int argc, char *argv[])
 
       if(out_image!=NULL)
       {
-        draw_points(Ic, corners, cells, nx, ny, nz, radius);
+        draw_points(Ic, corners, cells, nx, ny, nz, 2*sigma_n);
         iio_save_image_float_vec(out_image, Ic, nx, ny, nz);
       }
 
@@ -352,7 +351,7 @@ int main(int argc, char *argv[])
       {
         FILE *fd=fopen(out_file,"w");
         for(unsigned int i=0;i<corners.size();i++)
-          fprintf(fd, "%f %f %f %f\n", corners[i].x, corners[i].y, corners[i].Mcint, corners[i].Mc);
+          fprintf(fd, "%f %f %f\n", corners[i].x, corners[i].y, corners[i].Mc);
         fclose(fd);
       }
 
