@@ -399,7 +399,7 @@ void select_output_corners(
   * Function for computing subpixel precision of maxima
   *
 **/
-void subpixel_precision(
+void compute_subpixel_precision(
   float *Mc,  // discriminant function
   vector<harris_corner> &corners, // selected corners
   int nx
@@ -526,8 +526,7 @@ void harris(
   float max  = FLT_MIN;
   float min  = FLT_MAX;
 
-  //compute the discriminant function following one strategy 
-  //Harris, Shi-Tomasi, Harmonic mean
+  //calculate the discriminant function (Harris, Shi-Tomasi, Harmonic mean)
   compute_discriminant_function(A, B, C, Mc, measure, nx, ny, k, Th, max, min);
 
   if (verbose) 
@@ -543,7 +542,7 @@ void harris(
   }
   
   
-  //apply threshold to eliminate low values
+  //threshold the discriminant function
   if(measure!=SHI_TOMASI_MEASURE)
     for(int i=0; i<size; i++)
       if(Mc[i]<Th) Mc[i]=0;
@@ -595,8 +594,8 @@ void harris(
        gettimeofday(&start, NULL);
     }
 
-    //compute subpixel precision through quadratic interpolation
-    subpixel_precision(Mc, corners, nx);
+    //calculate subpixel precision
+    compute_subpixel_precision(Mc, corners, nx);
 
     if (verbose)
     {      

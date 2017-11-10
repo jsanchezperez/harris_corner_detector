@@ -18,7 +18,7 @@ extern "C"
 #define PAR_DEFAULT_THRESHOLD 10
 #define PAR_DEFAULT_MEASURE HARRIS_MEASURE
 #define PAR_DEFAULT_SELECT_STRATEGY ALL_CORNERS
-#define PAR_DEFAULT_CELLS 1
+#define PAR_DEFAULT_CELLS 3
 #define PAR_DEFAULT_NSELECT 2000
 #define PAR_DEFAULT_SUBPIXEL_PRECISION 0
 #define PAR_DEFAULT_VERBOSE 0
@@ -45,9 +45,9 @@ void print_help(char *name)
   printf("              default value %d\n", PAR_DEFAULT_MEASURE);
   printf("   -k N     Harris' K parameter\n");
   printf("              default value %f\n", PAR_DEFAULT_K);
-  printf("   -i N     Gauss standard deviation for image denoising\n");
+  printf("   -i N     Gaussian standard deviation for image denoising\n");
   printf("              default value %f\n", PAR_DEFAULT_SIGMA_I);    
-  printf("   -s N     Gauss standard deviation for weighted windows\n");
+  printf("   -s N     Gaussian standard deviation for weighted windows\n");
   printf("              default value %f\n", PAR_DEFAULT_SIGMA_N);
   printf("   -t N     threshold for eliminating low values\n");
   printf("              default value %d\n", PAR_DEFAULT_THRESHOLD);
@@ -179,6 +179,7 @@ int read_parameters(
 void draw_points(
   float *I, 
   std::vector<harris_corner> &corners,
+  int strategy,
   int cells,
   int nx, 
   int ny, 
@@ -187,6 +188,7 @@ void draw_points(
 )
 {
   
+  if(strategy==DISTRIBUTED_N_CORNERS)
   //draw cells limits
   for(int i=0; i<cells; i++)
   {
@@ -343,7 +345,7 @@ int main(int argc, char *argv[])
 
       if(out_image!=NULL)
       {
-        draw_points(Ic, corners, cells, nx, ny, nz, 2*sigma_n);
+        draw_points(Ic, corners, strategy, cells, nx, ny, nz, 2*sigma_n);
         iio_save_image_float_vec(out_image, Ic, nx, ny, nz);
       }
 
