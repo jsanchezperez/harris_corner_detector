@@ -385,10 +385,17 @@ void select_output_corners(
       //copy the Ncell first corners to the output array
       corners.resize(0);
       for(int i=0; i<size; i++)
-        corners.insert(
-          corners.end(), cell_corners[i].begin(), 
-          cell_corners[i].begin()+Ncell
-        );
+        if((int)cell_corners[i].size()>Ncell)
+          corners.insert(
+            corners.end(), cell_corners[i].begin(), 
+            cell_corners[i].begin()+Ncell
+          );
+        else
+          corners.insert(
+            corners.end(), cell_corners[i].begin(), 
+            cell_corners[i].end()
+          );
+        
       break;
   }
 }

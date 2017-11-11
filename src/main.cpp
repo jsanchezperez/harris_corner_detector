@@ -187,76 +187,84 @@ void draw_points(
   int radius
 )
 {
-  
   if(strategy==DISTRIBUTED_N_CORNERS)
-  //draw cells limits
-  for(int i=0; i<cells; i++)
   {
-    int Dx=nx/cells;
-    int dx=Dx;
-    while(dx<nx)
+    //draw cells limits
+    for(int i=0; i<cells; i++)
     {
-      if(nz>=3)
-        for(int y=0;y<ny;y++)
-        {
-          I[(y*nx+dx)*nz]=0;
-          I[(y*nx+dx)*nz+1]=0;
-          I[(y*nx+dx)*nz+2]=0;
-        }
-      else
-        for(int y=0;y<ny;y++)
-          I[y*nx+dx]=0;
-          
-      dx+=Dx;
-    }
+      int Dx=nx/cells;
+      int dx=Dx;
+      while(dx<nx)
+      {
+        if(nz>=3)
+          for(int y=0;y<ny;y++)
+          {
+            I[(y*nx+dx)*nz]=0;
+            I[(y*nx+dx)*nz+1]=0;
+            I[(y*nx+dx)*nz+2]=0;
+          }
+        else
+          for(int y=0;y<ny;y++)
+            I[y*nx+dx]=0;  
+        dx+=Dx;
+      }
     
-    int Dy=ny/cells;
-    int dy=Dy;
-    while(dy<ny)
-    {
-      if(nz>=3)
-        for(int x=0;x<nx;x++)
-        {
-          I[(dy*nx+x)*nz]=0;
-          I[(dy*nx+x)*nz+1]=0;
-          I[(dy*nx+x)*nz+2]=0;
-        }    
-      else
-        for(int x=0;x<nx;x++)
-          I[dy*nx+x]=0;
-
-      dy+=Dy;
+      int Dy=ny/cells;
+      int dy=Dy;
+      while(dy<ny)
+      {
+        if(nz>=3)
+          for(int x=0;x<nx;x++)
+          {
+            I[(dy*nx+x)*nz]=0;
+            I[(dy*nx+x)*nz+1]=0;
+            I[(dy*nx+x)*nz+2]=0;
+          }    
+        else
+          for(int x=0;x<nx;x++)
+            I[dy*nx+x]=0;
+        dy+=Dy;
+      }
     }
   }
 
   //draw a cross for each corner
   for(unsigned int i=0;i<corners.size();i++)
   {
-    const float x=corners[i].x;
-    const float y=corners[i].y;
-      
-    if(nz>=3)
-      for(int j=x-radius;j<=x+radius;j++)
-      {
-        I[((int)y*nx+j)*nz]=0;
-        I[((int)y*nx+j)*nz+1]=0;
-        I[((int)y*nx+j)*nz+2]=255;
-      }
-      else
-        for(int j=x-radius;j<=x+radius;j++)
-          I[(int)y*nx+j]=255;
+    int x=corners[i].x;
+    int y=corners[i].y;
+
+    int x0=(x-radius<0)?0: x-radius;
+    int x1=(x+radius>=nx)?nx-1: x+radius;
+    int y0=(y-radius<0)?0: y-radius;
+    int y1=(y+radius>=ny)?ny-1: y+radius;
 
     if(nz>=3)
-      for(int j=y-radius;j<=y+radius;j++)
+    {
+      for(int j=x0;j<=x1;j++)
       {
-        I[(j*nx+(int)x)*nz]=0;
-        I[(j*nx+(int)x)*nz+1]=0;
-        I[(j*nx+(int)x)*nz+2]=255;
+        I[(y*nx+j)*nz]=0;
+        I[(y*nx+j)*nz+1]=0;
+        I[(y*nx+j)*nz+2]=255;
       }
-      else
-        for(int j=y-radius;j<=y+radius;j++)
-          I[j*nx+(int)x]=255;
-  }
+    }
+    else
+      for(int j=x0;j<=x1;j++)
+          I[y*nx+j]=255;
+    
+    if(nz>=3)
+    {
+      for(int j=y0;j<=y1;j++)
+      {
+        I[(j*nx+x)*nz]=0;
+        I[(j*nx+x)*nz+1]=0;
+        I[(j*nx+x)*nz+2]=255;
+      }
+    }
+    else
+        for(int j=y0;j<=y1;j++)
+          I[j*nx+x]=255;
+    }
 }
 
 
@@ -268,12 +276,14 @@ void draw_points(
 void rgb2gray(
   float *rgb,  //input color image
   float *gray, //output grayscale image
-  int size     //number of pixels
+  int   nx,     //number of columns
+  int   ny,     //number of rows
+  int   nz      //number of channels
 )
 {
   #pragma omp parallel for
-  for(int i=0;i<size;i++)
-    gray[i]=(0.2989*rgb[i*3]+0.5870*rgb[i*3+1]+0.1140*rgb[i*3+2]);
+  for(int i=0;i<nx*ny;i++)
+    gray[i]=(0.2989*rgb[i*nz]+0.5870*rgb[i*nz+1]+0.1140*rgb[i*nz+2]);
 }
 
 
@@ -319,7 +329,7 @@ int main(int argc, char *argv[])
       float *I=new float[nx*ny];
 
       if(nz>1)
-        rgb2gray(Ic, I, nx*ny);
+        rgb2gray(Ic, I, nx, ny, nz);
       else
         for(int i=0;i<nx*ny;i++)
           I[i]=Ic[i];
@@ -352,6 +362,8 @@ int main(int argc, char *argv[])
       if(out_file!=NULL)
       {
         FILE *fd=fopen(out_file,"w");
+       
+        fprintf(fd, "Number of points: %ld\n", corners.size());
         for(unsigned int i=0;i<corners.size();i++)
           fprintf(fd, "%f %f %f\n", corners[i].x, corners[i].y, corners[i].Mc);
         fclose(fd);
