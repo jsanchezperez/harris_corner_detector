@@ -359,7 +359,8 @@ void select_output_corners(
 
     case N_CORNERS:
       sort(corners.begin(), corners.end());
-      corners.erase(corners.begin()+Nselect, corners.end());
+      if(Nselect<(int)corners.size())
+        corners.erase(corners.begin()+Nselect, corners.end());
       break;
 
     case DISTRIBUTED_N_CORNERS:
