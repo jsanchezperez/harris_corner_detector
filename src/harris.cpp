@@ -364,19 +364,24 @@ void select_output_corners(
       break;
 
     case DISTRIBUTED_N_CORNERS:
-      int size=cells*cells;
-      int Ncell=Nselect/size;
-      vector<vector<harris_corner>> cell_corners(size);
+      int cellx=cells, celly=cells;
+      if(cellx>nx) cellx=nx;
+      if(celly>ny) celly=ny;
 
+      int size=cellx*celly;
+      int Ncell=Nselect/size;
+      if(Ncell<1) Ncell=1;
+      vector<vector<harris_corner>> cell_corners(size);
+            
+      float Dx=(float)nx/cellx;
+      float Dy=(float)ny/celly;
+      
       //distribute corners in the cells
-      int Dx=nx/cells;
-      int Dy=ny/cells;
       for(unsigned int i=0; i<corners.size(); i++)
       {
-        int px=corners[i].x/Dx;
-        int py=corners[i].y/Dy;
-
-        cell_corners[py*cells+px].push_back(corners[i]);
+        int px=(float)corners[i].x/Dx;
+        int py=(float)corners[i].y/Dy;
+        cell_corners[(int)(py*cellx+px)].push_back(corners[i]);
       }
 
       //sort the corners in each cell
@@ -396,7 +401,6 @@ void select_output_corners(
             corners.end(), cell_corners[i].begin(), 
             cell_corners[i].end()
           );
-        
       break;
   }
 }

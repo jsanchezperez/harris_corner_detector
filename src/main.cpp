@@ -57,7 +57,7 @@ void print_help(char *name)
   printf("              default value %d\n", PAR_DEFAULT_SELECT_STRATEGY);
   printf("   -c N     regions for output corners (1x1, 2x2,...NxN):\n");
   printf("              default value %d\n", PAR_DEFAULT_CELLS);
-  printf("   -N N     number of output corners\n");
+  printf("   -n N     number of output corners\n");
   printf("              default value %d\n", PAR_DEFAULT_NSELECT);
   printf("   -p       subpixel precision through quadratic interpolation\n");
   printf("   -v       switch on verbose mode \n");
@@ -145,7 +145,7 @@ int read_parameters(
         if(i<argc-1)
           cells=atoi(argv[++i]);
 
-      if(strcmp(argv[i],"-N")==0)
+      if(strcmp(argv[i],"-n")==0)
         if(i<argc-1)
           Nselect=atoi(argv[++i]);
 
@@ -162,7 +162,7 @@ int read_parameters(
     if(k<=0)      k       = PAR_DEFAULT_K;
     if(sigma_i<0) sigma_i = PAR_DEFAULT_SIGMA_I;
     if(sigma_n<0) sigma_n = PAR_DEFAULT_SIGMA_N;
-    if(cells<0)   cells   = PAR_DEFAULT_CELLS;
+    if(cells<1)   cells   = PAR_DEFAULT_CELLS;
     if(Nselect<1) Nselect = PAR_DEFAULT_NSELECT;
   }
 
@@ -192,37 +192,41 @@ void draw_points(
     //draw cells limits
     for(int i=0; i<cells; i++)
     {
-      int Dx=nx/cells;
-      int dx=Dx;
+      int cellx=cells, celly=cells;
+      if(cellx>nx) cellx=nx;
+      if(celly>ny) celly=ny;
+
+      float Dx=(float)nx/cellx;
+      float dx=Dx;
       while(dx<nx)
       {
         if(nz>=3)
           for(int y=0;y<ny;y++)
           {
-            I[(y*nx+dx)*nz]=0;
-            I[(y*nx+dx)*nz+1]=0;
-            I[(y*nx+dx)*nz+2]=0;
+            I[(y*nx+(int)dx)*nz]=0;
+            I[(y*nx+(int)dx)*nz+1]=0;
+            I[(y*nx+(int)dx)*nz+2]=0;
           }
         else
           for(int y=0;y<ny;y++)
-            I[y*nx+dx]=0;  
+            I[y*nx+(int)dx]=0;  
         dx+=Dx;
       }
     
-      int Dy=ny/cells;
-      int dy=Dy;
+      float Dy=(float)ny/celly;
+      float dy=Dy;
       while(dy<ny)
       {
         if(nz>=3)
           for(int x=0;x<nx;x++)
           {
-            I[(dy*nx+x)*nz]=0;
-            I[(dy*nx+x)*nz+1]=0;
-            I[(dy*nx+x)*nz+2]=0;
+            I[((int)dy*nx+x)*nz]=0;
+            I[((int)dy*nx+x)*nz+1]=0;
+            I[((int)dy*nx+x)*nz+2]=0;
           }    
         else
           for(int x=0;x<nx;x++)
-            I[dy*nx+x]=0;
+            I[(int)dy*nx+x]=0;
         dy+=Dy;
       }
     }
