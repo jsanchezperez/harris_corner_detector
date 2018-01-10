@@ -6,6 +6,8 @@
 #include <float.h>
 
 #include "harris.h"
+#include "gaussian.h"
+#include "gradient.h"
 
 extern "C"
 {
@@ -13,9 +15,11 @@ extern "C"
 }
 
 #define PAR_DEFAULT_K 0.06
-#define PAR_DEFAULT_SIGMA_I 1.0
-#define PAR_DEFAULT_SIGMA_N 2.5
+#define PAR_DEFAULT_SIGMA_D 1.0
+#define PAR_DEFAULT_SIGMA_I 2.5
 #define PAR_DEFAULT_THRESHOLD 10
+#define PAR_DEFAULT_GAUSSIAN FAST_GAUSSIAN
+#define PAR_DEFAULT_GRADIENT CENTRAL_DIFFERENCES
 #define PAR_DEFAULT_MEASURE HARRIS_MEASURE
 #define PAR_DEFAULT_SELECT_STRATEGY ALL_CORNERS
 #define PAR_DEFAULT_CELLS 3
@@ -40,15 +44,21 @@ void print_help(char *name)
   printf("  --------\n");
   printf("   -o name  output image with detected corners \n");
   printf("   -f name  write points to file\n");
+  printf("   -s N     choose smoothing: \n"); 
+  printf("              0.slow Gaussian; 1.fast Gaussian; 2.No Gaussian\n"); 
+  printf("              default value %d\n", PAR_DEFAULT_GAUSSIAN);
+  printf("   -g N     choose gradient: \n"); 
+  printf("              0.central differences; 1.Sobel operator\n"); 
+  printf("              default value %d\n", PAR_DEFAULT_GRADIENT);
   printf("   -m N     choose measure: \n"); 
   printf("              0.Harris; 1.Shi-Tomasi; 2.Harmonic Mean\n"); 
   printf("              default value %d\n", PAR_DEFAULT_MEASURE);
   printf("   -k N     Harris' K parameter\n");
   printf("              default value %f\n", PAR_DEFAULT_K);
-  printf("   -i N     Gaussian standard deviation for image denoising\n");
-  printf("              default value %f\n", PAR_DEFAULT_SIGMA_I);    
-  printf("   -s N     Gaussian standard deviation for weighted windows\n");
-  printf("              default value %f\n", PAR_DEFAULT_SIGMA_N);
+  printf("   -d N     Gaussian standard deviation for derivation\n");
+  printf("              default value %f\n", PAR_DEFAULT_SIGMA_D);    
+  printf("   -i N     Gaussian standard deviation for integration\n");
+  printf("              default value %f\n", PAR_DEFAULT_SIGMA_I);
   printf("   -t N     threshold for eliminating low values\n");
   printf("              default value %d\n", PAR_DEFAULT_THRESHOLD);
   printf("   -q N     strategy for selecting the output corners:\n");
@@ -75,10 +85,12 @@ int read_parameters(
   char  **image,  
   char  **out_image,
   char  **out_file,
+  int   &gaussian,
+  int   &gradient,
   int   &measure,
   float &k,
-  float &sigma_i,  
-  float &sigma_n,
+  float &sigma_d,  
+  float &sigma_i,
   float &threshold,
   int   &strategy,
   int   &cells,
@@ -97,8 +109,10 @@ int read_parameters(
 
     //assign default values to the parameters
     k=PAR_DEFAULT_K;
-    sigma_i=PAR_DEFAULT_SIGMA_I;    
-    sigma_n=PAR_DEFAULT_SIGMA_N;
+    sigma_d=PAR_DEFAULT_SIGMA_D;    
+    sigma_i=PAR_DEFAULT_SIGMA_I;
+    gaussian=PAR_DEFAULT_GAUSSIAN;
+    gradient=PAR_DEFAULT_GRADIENT;
     measure=PAR_DEFAULT_MEASURE;
     threshold=PAR_DEFAULT_THRESHOLD;
     strategy=PAR_DEFAULT_SELECT_STRATEGY;
@@ -118,6 +132,12 @@ int read_parameters(
         if(i<argc-1)
           *out_file=argv[++i];
       
+      if(strcmp(argv[i],"-s")==0)
+        gaussian=atoi(argv[++i]);
+
+      if(strcmp(argv[i],"-g")==0)
+        gradient=atoi(argv[++i]);
+
       if(strcmp(argv[i],"-m")==0)
         measure=atoi(argv[++i]);
 
@@ -127,11 +147,11 @@ int read_parameters(
 
       if(strcmp(argv[i],"-i")==0)
         if(i<argc-1)
-          sigma_i=atof(argv[++i]);        
+          sigma_d=atof(argv[++i]);        
         
       if(strcmp(argv[i],"-s")==0)
         if(i<argc-1)
-          sigma_n=atof(argv[++i]);
+          sigma_i=atof(argv[++i]);
         
       if(strcmp(argv[i],"-t")==0)
         if(i<argc-1)
@@ -160,8 +180,8 @@ int read_parameters(
 
     //check parameter values
     if(k<=0)      k       = PAR_DEFAULT_K;
+    if(sigma_d<0) sigma_d = PAR_DEFAULT_SIGMA_D;
     if(sigma_i<0) sigma_i = PAR_DEFAULT_SIGMA_I;
-    if(sigma_n<0) sigma_n = PAR_DEFAULT_SIGMA_N;
     if(cells<1)   cells   = PAR_DEFAULT_CELLS;
     if(Nselect<1) Nselect = PAR_DEFAULT_NSELECT;
   }
@@ -300,15 +320,15 @@ int main(int argc, char *argv[])
 {
   //parameters of the method
   char  *image, *out_image=NULL, *out_file=NULL;
-  float k, sigma_i, sigma_n, threshold;
-  int   strategy, Nselect, measure;
+  float k, sigma_d, sigma_i, threshold;
+  int   gaussian, gradient, strategy, Nselect, measure;
   int   subpixel_precision, cells, verbose;
 
   //read the parameters from the console
   int result=read_parameters(
         argc, argv, &image, &out_image, &out_file, 
-        measure, k, sigma_i, sigma_n, threshold, strategy, 
-        cells, Nselect, subpixel_precision, verbose
+        gaussian, gradient, measure, k, sigma_d, sigma_i, threshold, 
+        strategy, cells, Nselect, subpixel_precision, verbose
       );
 
   if(result)
@@ -319,12 +339,12 @@ int main(int argc, char *argv[])
     if(verbose)
       printf(
         "Parameters:\n"
-        "  Input image: '%s', Output image: '%s', Output corner file: %s\n"
-        "  measure: %d, K: %f, Sigma_i: %f, Sigma_n: %f, Threshold: %f, \n"
-        "  Select strategy: %d, Number of cells: %d, Nselect: %d, \n"
-        "  nx: %d, ny: %d, nz: %d\n",
-        image, out_image, out_file,  measure, k, sigma_i, sigma_n, 
-        threshold, strategy, cells, Nselect, nx, ny, nz
+        "  input image: '%s', output image: '%s', output corner file: %s\n"
+        "  gaussian: %d, gradient: %d, measure: %d, K: %f, sigma_d: %f  \n"
+        "  sigma_i: %f, threshold: %f, strategy: %d, Number of cells: %d\n"
+        "  Nselect: %d, nx: %d, ny: %d, nz: %d\n",
+        image, out_image, out_file, gaussian, gradient, measure, k, 
+        sigma_d, sigma_i, threshold, strategy, cells, Nselect, nx, ny, nz
       );
 
     if (Ic!=NULL)
@@ -345,8 +365,9 @@ int main(int argc, char *argv[])
 
       //compute Harris' corners
       harris(
-        I, corners, measure, k, sigma_i, sigma_n, threshold, strategy,
-        cells, Nselect, subpixel_precision, nx, ny, verbose
+        I, corners, gaussian, gradient, measure, k, sigma_d, 
+        sigma_i, threshold, strategy, cells, Nselect, 
+        subpixel_precision, nx, ny, verbose
       );
 
       if (verbose) 
@@ -359,7 +380,7 @@ int main(int argc, char *argv[])
 
       if(out_image!=NULL)
       {
-        draw_points(Ic, corners, strategy, cells, nx, ny, nz, 2*sigma_n);
+        draw_points(Ic, corners, strategy, cells, nx, ny, nz, 2*sigma_i);
         iio_save_image_float_vec(out_image, Ic, nx, ny, nz);
       }
 

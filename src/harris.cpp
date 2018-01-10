@@ -43,7 +43,9 @@ void compute_autocorrelation_matrix(
   float *C,    //bottom-right coefficient of the Autocorrelation matrix
   float sigma, //standard deviation for smoothing (pixel neighbourhood)
   int   nx,    //number of columns of the image
-  int   ny     //number of rows of the image
+  int   ny,    //number of rows of the image
+  int   gauss  // type of Gaussian 
+
 )
 {
 #pragma omp parallel for
@@ -53,10 +55,13 @@ void compute_autocorrelation_matrix(
      B[i] = Ix[i]*Iy[i];
      C[i] = Iy[i]*Iy[i];
   }
+  
+  if(gauss==NO_GAUSSIAN)
+    gauss=FAST_GAUSSIAN;
 
-  gaussian(A, nx, ny, sigma);
-  gaussian(B, nx, ny, sigma);
-  gaussian(C, nx, ny, sigma);
+  gaussian(A, nx, ny, sigma, gauss);
+  gaussian(B, nx, ny, sigma, gauss);
+  gaussian(C, nx, ny, sigma, gauss);
 } 
 
 
@@ -85,6 +90,7 @@ void compute_discriminant_function(
   switch(measure) 
   {
     default: case HARRIS_MEASURE:
+      #pragma omp parallel for
       for (int i=0; i<size; i++)
       {
         float detA   = A[i]*C[i] - B[i]*B[i];
@@ -98,6 +104,7 @@ void compute_discriminant_function(
       break;
 
     case HARMONIC_MEAN_MEASURE: 
+      #pragma omp parallel for
       for (int i=0; i<size; i++)
       {
         float detA  =A[i]*C[i]-B[i]*B[i];
@@ -111,6 +118,7 @@ void compute_discriminant_function(
       break;
 
     case SHI_TOMASI_MEASURE:
+      #pragma omp parallel for
       for (int i=0; i<size; i++)
       {
         float D = sqrt(A[i]*A[i]-2*A[i]*C[i]+4*B[i]*B[i]+C[i]*C[i]);
@@ -131,126 +139,31 @@ void compute_discriminant_function(
 
 /**
   *
-  * Function for computing the spiral order indexes
-  * for non-maximum_suppression
-  *
-**/
-// void spiral_order(
-//   int *index,
-//   int radius,
-//   int nx,
-//   int bruteforce=0
-// )
-// {
-//   int size=(2*radius+1)*(2*radius+1)-2*radius-1;
-//   
-//   int x=1, y=1;    //initial position
-//   int dx=-1, dy=0; //iterative increment
-//   int c=2;         //number of positions per branch
-//   int d=0;         //directions: 0-left; 1-up; 2-right; 3-down
-//   
-//   //the first position is the botton-right corner
-//   index[0]=y*nx+x;
-//   
-//   int i=1;
-//   while(i<size)
-//   {
-//     //process following line
-//     for(int j=0; j<c && i<size; j++)
-//     {
-//       //next position in the line
-//       x+=dx; y+=dy;
-//       
-//       //do not include the central line in the index
-//       if(y!=0 || bruteforce) 
-//       {
-//         index[i]=y*nx+x;
-//         i++;
-//       }
-//     }    
-//         
-//     //change direction
-//     d=(d+1)%4;
-//     switch(d)
-//     {
-//       case 0: dx=-1; dy=0;  break;
-//       case 1: dx=0;  dy=-1; break;
-//       case 2: dx=1;  dy=0;  break;
-//       case 3: dx=0;  dy=1;  break;  
-//     }
-//     
-//     //increase traverse
-//     if(d==0 || d==2) 
-//       c++;
-//   }
-// }
-
-
-//#define BRUTEFORCE
-//#define SPIRAL_TEST
-
-/**
-  *
   * Function for non-maximum suppression
   *
 **/
 void non_maximum_suppression(
-  float *I,             // input image
-  vector<harris_corner> &corners,  // Harris' corners
+  float *D,             // input image
+  vector<harris_corner> &corners, // Harris' corners
   int   radius,         // window radius
   int   nx,             // number of columns of the image
-  int   ny,             // number of rows of the image
-  int   verbose         // activate verbose mode
+  int   ny              // number of rows of the image
 )
 {
-
-// #ifdef BRUTEFORCE
-//   
-//   for(int i=radius; i<ny-radius; i++)
-//   {
-//     for(int j=radius; j<nx-radius; j++)
-//     {
-//       int k=i-radius; 
-//       bool found=false;
-//       while(!found && k<=i+radius)
-//       {
-//         int l=j-radius;
-//         while(!found && l<=j+radius)
-//         {
-//           if(I[k*nx+l]>I[i*nx+j])
-//             found=true;
-//           l++;
-//         }
-//         k++;
-//       }
-//       
-//       //if we found a local maximum add to the list
-//       if(!found) 
-//         corners.push_back({(float)j, (float)i, I[i*nx+j]});
-//     }
-//   }
-// 
-// #else
-
   int *skip  = new int[nx*ny]();
   int size   = (2*radius+1)*(2*radius+1)-2*radius-1;
-  //int *index = new int[size];
-
-  //create the spiral order index
- // spiral_order(index, radius, nx);
-
-//#pragma omp parallel for
+ 
   for(int i=radius; i<ny-radius; i++)
   {
     int j=radius;
     
     //avoid the downhill at the beginning
-    while(I[i*nx+j-1]>=I[i*nx+j] && j<nx-radius) j++;
+    while(D[i*nx+j-1]>=D[i*nx+j] && j<nx-radius) j++;
       
     while(j<nx-radius)
     {
       //find the next peak 
-      while((skip[i*nx+j] || I[i*nx+j+1]>=I[i*nx+j]) && j<nx-radius)
+      while((skip[i*nx+j] || D[i*nx+j+1]>=D[i*nx+j]) && j<nx-radius)
         j++;
       
       if(j<nx-radius)
@@ -258,44 +171,34 @@ void non_maximum_suppression(
         int p1=j+2;
 
         //find a bigger value on the right
-        while(I[i*nx+p1]<I[i*nx+j] && p1<=j+radius) 
+        while(D[i*nx+p1]<D[i*nx+j] && p1<=j+radius) 
         {
           skip[i*nx+p1]=1;
           p1++;
         }
 
+        //if not found
         if(p1>j+radius)
         {  
           int p2=j-1;
   
           //find a bigger value on the left
-          while(I[i*nx+p2]<=I[i*nx+j] && p2>=j-radius)
+          while(D[i*nx+p2]<=D[i*nx+j] && p2>=j-radius)
             p2--;
   
+          //if not found, test the 2D region
           if(p2<j-radius)
           {
-// #ifdef SPIRAL_TEST
-//             //spiral order test
-//             int s=0;
-//             while(s<size && I[i*nx+j+index[s]]<I[i*nx+j])
-//             {
-//               //if(i*nx+j+index[s]>i*nx+j)
-//               skip[i*nx+j+index[s]]=1;
-//               s++;	       
-//             }
-// 
-//             //new local maximum found
-//             if(s>=size) 
-//               corners.push_back({(float)j, (float)i, I[i*nx+j]});
-// #else
             int k=i+radius; 
             bool found=false;
+
+            //first test the bottom region (backwards)
             while(!found && k>i)
             {
               int l=j+radius;
               while(!found && l>=j-radius)
               {
-                if(I[k*nx+l]>I[i*nx+j])
+                if(D[k*nx+l]>D[i*nx+j])
                   found=true;
                 else skip[k*nx+l]=1;
                 l--;
@@ -304,12 +207,14 @@ void non_maximum_suppression(
             }
             
             k=i-radius; 
+
+            //then test the top region (forwards)
             while(!found && k<i)
             {
               int l=j-radius;
               while(!found && l<=j+radius)
               {
-                if(I[k*nx+l]>=I[i*nx+j])
+                if(D[k*nx+l]>=D[i*nx+j])
                   found=true;
                 else skip[k*nx+l]=1;
                 l++;
@@ -317,22 +222,19 @@ void non_maximum_suppression(
               k++;
             }
             
-            if(!found) 
-              corners.push_back({(float)j, (float)i, I[i*nx+j]});
-// #endif
-	  }
-          j++;
+            if(!found)
+              //a new local maximum detected
+              corners.push_back({(float)j, (float)i, D[i*nx+j]});
+          }
         }
-        else j=p1;
+        j=p1;
       }
     }
   }
   
   delete []skip;
-  //delete []index;
-
-//#endif
 }
+
 
 /**
   *
@@ -417,6 +319,7 @@ void compute_subpixel_precision(
   int nx
 )
 {
+  #pragma omp parallel for
   for(unsigned int i=0; i<corners.size(); i++)
   {
     const float x=corners[i].x;
@@ -450,11 +353,13 @@ void compute_subpixel_precision(
 **/
 void harris(
   float *I,        // input image
-  vector<harris_corner> &corners, // output selected corners
+  vector<harris_corner> &corners, // output selected cornersç
+  int   gauss,     // type of Gaussian 
+  int   grad,      // type of gradient
   int   measure,   // measure for the discriminant function
   float k,         // Harris constant for the ....function
-  float sigma_i,   // standard deviation for smoothing (image denoising)    
-  float sigma_n,   // standard deviation for smoothing (pixel neighbourhood)
+  float sigma_d,   // standard deviation for smoothing (image denoising)    
+  float sigma_i,   // standard deviation for smoothing (pixel neighbourhood)
   float Th,        // threshold for eliminating low values
   int   strategy,  // strategy for the output corners
   int   cells,     // number of regions in the image for distributed output
@@ -468,51 +373,48 @@ void harris(
   int size=nx*ny;
   float *Ix=new float[size];
   float *Iy=new float[size];
-  float *Mc=new float[size];
 
   struct timeval start, end;
   
   if (verbose)
   {
-     printf("Harris corner detection:\n");
-     printf(" 1.Convolving image with Gaussian (sigma=%f)\n", sigma_i);
+     printf("\n\nHarris corner detection:\n");
+     printf(" 1.Convolving image with Gaussian: \t");
     
      gettimeofday(&start, NULL);    
   }
 
   //smooth the original image to reduce noise
-  gaussian(I, nx, ny, sigma_i);
+  gaussian(I, nx, ny, sigma_d, gauss);
 
   if (verbose)
   {  
      gettimeofday(&end, NULL);
-     printf("\n Time: %fs\n", ((end.tv_sec-start.tv_sec)* 1000000u + 
+     printf("Time: %fs\n", ((end.tv_sec-start.tv_sec)* 1000000u + 
             end.tv_usec - start.tv_usec) / 1.e6);
 
-     printf(" 2.Computing the gradient of the image\n");
-  
-     gettimeofday(&start, NULL);
+     printf(" 2.Computing the gradient: \t \t");
   }
   
   //compute the gradient of the image
-  gradient(I, Ix, Iy, nx, ny);
+  gradient(I, Ix, Iy, nx, ny, grad);
 
   if (verbose) 
   {  
      gettimeofday(&end, NULL);
-     printf("\n Time: %fs\n", ((end.tv_sec-start.tv_sec)* 1000000u + 
+     printf("Time: %fs\n", ((end.tv_sec-start.tv_sec)* 1000000u + 
             end.tv_usec - start.tv_usec) / 1.e6);
 
-     printf("  -Saving Is.png, Ix.png, Iy.png\n");
+//      printf("  -Saving Is.png, Ix.png, Iy.png\n");
+// 
+//      char name1[200]="Is.png";
+//      char name2[200]="Ix.png";
+//      char name3[200]="Iy.png";
+//      iio_save_image_float_vec(name1, I, nx, ny, 1);
+//      iio_save_image_float_vec(name2, Ix, nx, ny, 1);
+//      iio_save_image_float_vec(name3, Iy, nx, ny, 1);
 
-     char name1[200]="Is.png";
-     char name2[200]="Ix.png";
-     char name3[200]="Iy.png";
-     iio_save_image_float_vec(name1, I, nx, ny, 1);
-     iio_save_image_float_vec(name2, Ix, nx, ny, 1);
-     iio_save_image_float_vec(name3, Iy, nx, ny, 1);
-
-     printf(" 3.Computing the Autocorrelation matrix \n");
+     printf(" 3.Computing the Autocorrelation: \t");
 
      gettimeofday(&start, NULL);
   }
@@ -523,23 +425,30 @@ void harris(
   float *C = new float[size];
 
   //compute the Autocorrelation matrix
-  compute_autocorrelation_matrix(Ix, Iy, A, B, C, sigma_n, nx, ny);
-  
+  compute_autocorrelation_matrix(Ix, Iy, A, B, C, sigma_i, nx, ny, gauss);
+
   if (verbose) 
   {  
      gettimeofday(&end, NULL);
-     printf("\n Time: %fs\n", ((end.tv_sec-start.tv_sec)* 1000000u + 
+     printf("Time: %fs\n", ((end.tv_sec-start.tv_sec)* 1000000u + 
             end.tv_usec - start.tv_usec) / 1.e6);
 
-    printf(" 4.Computing the discriminant function (0.Harris, 1.Shi-Tomasi, 2.Szeliski): %d\n", measure);
+    printf(" 4.Computing Harris function: \t\t");
     gettimeofday(&start, NULL);     
   }
 
-  float max  = FLT_MIN;
-  float min  = FLT_MAX;
+  float max = FLT_MIN;
+  float min = FLT_MAX;
+  float *Mc = new float[size];
 
   //calculate the discriminant function (Harris, Shi-Tomasi, Harmonic mean)
   compute_discriminant_function(A, B, C, Mc, measure, nx, ny, k, Th, max, min);
+
+  delete []Ix;
+  delete []Iy;
+  delete []A;
+  delete []B;
+  delete []C;
 
   if (verbose) 
   {
@@ -547,15 +456,15 @@ void harris(
      printf("Time: %fs\n", ((end.tv_sec-start.tv_sec)* 1000000u + 
             end.tv_usec - start.tv_usec) / 1.e6);
      
-     printf("  -Mc max=%f, Mc min=%f\n",max, min);     
+    // printf("  -Mc max=%f, Mc min=%f\n",max, min);     
      
-     printf("\n 5.Apply threshold\n");
+     printf(" 5.Apply threshold: \t\t \t");
      gettimeofday(&start, NULL);     
   }
   
-  
   //threshold the discriminant function
   if(measure!=SHI_TOMASI_MEASURE)
+    #pragma omp parallel for
     for(int i=0; i<size; i++)
       if(Mc[i]<Th) Mc[i]=0;
     
@@ -566,13 +475,13 @@ void harris(
      printf("Time: %fs\n", ((end.tv_sec-start.tv_sec)* 1000000u + 
             end.tv_usec - start.tv_usec) / 1.e6);
      
-     printf("\n 6.Non-maximum suppression\n");
+     printf(" 6.Non-maximum suppression:  \t\t");
      gettimeofday(&start, NULL);     
   }
 
   //apply non-maximum suppression to select salient corners
-  int radius=2*sigma_n;
-  non_maximum_suppression(Mc, corners, radius, nx, ny, verbose);
+  int radius=2*sigma_i;
+  non_maximum_suppression(Mc, corners, radius, nx, ny);
 
   if (verbose) 
   {
@@ -583,7 +492,7 @@ void harris(
 
   if (verbose) 
   {
-     printf("\n 7.Selecting output corners\n");
+     printf(" 7.Selecting output corners:  \t\t");
      gettimeofday(&start, NULL);     
   }
 
@@ -602,7 +511,7 @@ void harris(
   {
     if (verbose)
     {
-       printf("\n 8.Computing subpixel precision\n");
+       printf(" 8.Computing subpixel precision: \t");
        gettimeofday(&start, NULL);
     }
 
@@ -619,21 +528,16 @@ void harris(
 
   if(verbose)
   {
-    printf("  -Number of detected corner points: %ld\n", corners.size());
-    printf("  -Saving Mc.png \n");
-    for(int i=0;i<nx*ny;i++) Mc[i]=255*(Mc[i]-min)/(max-min); 
-    char name[200]="Mc.png";
-    iio_save_image_float_vec(name, Mc, nx, ny, 1);
-
-    printf("  -Saving selected_Mc.png \n");
-    char name1[200]="selected_Mc.png";
-    iio_save_image_float_vec(name1, Mc, nx, ny, 1);
+    printf(" * Number of corners detected: %ld\n", corners.size());
+//     printf("  -Saving Mc.png \n");
+//     for(int i=0;i<nx*ny;i++) Mc[i]=255*(Mc[i]-min)/(max-min); 
+//     char name[200]="Mc.png";
+//     iio_save_image_float_vec(name, Mc, nx, ny, 1);
+// 
+//     printf("  -Saving selected_Mc.png \n");
+//     char name1[200]="selected_Mc.png";
+//     iio_save_image_float_vec(name1, Mc, nx, ny, 1);
   }
   
   delete []Mc;
-  delete []Ix;
-  delete []Iy;
-  delete []A;
-  delete []B;
-  delete []C;
 }

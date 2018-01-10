@@ -22,6 +22,8 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
+#include <immintrin.h>  //include AVX
 
 #ifndef M_PI
 /** \brief The constant pi */
@@ -74,7 +76,6 @@ void sii_precomp(sii_coeffs *c, double sigma, int K)
     double sum;
     int k;
     
-    //assert(c && sigma > 0 && SII_VALID_K(K));
     c->K = K;
     
     for (k = 0, sum = 0; k < K; ++k)
@@ -100,7 +101,7 @@ void sii_precomp(sii_coeffs *c, double sigma, int K)
  * of the signal (or in 2D, max(width, height)) plus the twice largest box
  * radius, for padding.
  */
-long sii_buffer_size(sii_coeffs c, long N)
+long sii_buffer_size(sii_coeffs &c, long N)
 {
     long pad = c.radii[0] + 1;
     return N + 2 * pad;
@@ -148,8 +149,13 @@ long sii_buffer_size(sii_coeffs c, long N)
  * extension cheaply) and samples that are provably in the interior (where
  * boundary checks may omitted be entirely).
  */
-static long extension(long N, long n)
+inline long extension(long N, long n)
 {
+    //constant boundary conditions
+    if (n < 0) return 0;
+    else if(n >= N) return N-1;
+    
+    //deprecated
     while (1)
         if (n < 0)
             n = -1 - n;         /* Reflect over n = -1/2.    */
@@ -181,7 +187,7 @@ static long extension(long N, long n)
  * source array is overwritten with the result). However, the buffer array
  * must be distinct from `src` and `dest`.
  */
-void sii_gaussian_conv(sii_coeffs c, float *dest, float *buffer,
+void sii_gaussian_conv(sii_coeffs &c, float *dest, float *buffer,
     const float *src, long N, long stride)
 {
     float accum;
@@ -200,20 +206,54 @@ void sii_gaussian_conv(sii_coeffs c, float *dest, float *buffer,
         accum += src[stride * extension(N, n)];
         buffer[n] = accum;
     }
-    
-    /* Compute stacked box filters. */
-    for (n = 0; n < N; ++n, dest += stride)
+
+    n=0;
+
+#ifdef __AVX_DEPRECATED__   //parece que con -O3 no aporta mucho
+    /* Compute stacked box filters (parallel). */
+    for (; n < N-8; n+=8, dest+=8*stride)
+    {
+        __m256 accum = _mm256_setzero_ps();
+
+        for (k = 0; k < c.K; ++k)
+        {
+          __m256 b1 = _mm256_loadu_ps(&buffer[n + c.radii[k]]);
+          __m256 b2 = _mm256_loadu_ps(&buffer[n - c.radii[k] - 1]);
+
+          __m256 b3 = _mm256_sub_ps(b1, b2);
+
+          __m256 wght = _mm256_set1_ps(c.weights[k]);
+
+         // accum = _mm256_fmadd_ps(wght, b3, accum); //doesn't compile
+          accum = _mm256_add_ps(accum, _mm256_mul_ps(wght, b3));
+        }
+        
+        float *vec = (float*)&accum;
+        *dest            = vec[0];
+        *(dest+1*stride) = vec[1];
+        *(dest+2*stride) = vec[2];
+        *(dest+3*stride) = vec[3];
+        *(dest+4*stride) = vec[4];
+        *(dest+5*stride) = vec[5];
+        *(dest+6*stride) = vec[6];
+        *(dest+7*stride) = vec[7];
+    }
+
+#endif
+
+    /* Compute stacked box filters (sequentially)*/
+    for (;n < N; ++n, dest += stride)
     {
         accum = c.weights[0] * (buffer[n + c.radii[0]]
-            - buffer[n - c.radii[0] - 1]);
-        
+                - buffer[n - c.radii[0] - 1]);
+
         for (k = 1; k < c.K; ++k)
             accum += c.weights[k] * (buffer[n + c.radii[k]]
-                - buffer[n - c.radii[k] - 1]);
-        
+                     - buffer[n - c.radii[k] - 1]);
+
         *dest = accum;
     }
-    
+
     return;
 }
 
@@ -235,13 +275,11 @@ void sii_gaussian_conv(sii_coeffs c, float *dest, float *buffer,
  * source array is overwritten with the result). However, the buffer array
  * must be distinct from `src` and `dest`.
  */
-void sii_gaussian_conv_image(sii_coeffs c, float *dest, float *buffer,
-    const float *src, int width, int height, int num_channels)
+void sii_gaussian_conv_image(sii_coeffs &c, float *dest,
+    const float *src, int nx, int ny, int num_channels)
 {
-    long num_pixels = ((long)width) * ((long)height);
+    long num_pixels = ((long)nx) * ((long)ny);
     int x, y, channel;
-    
-    //assert(dest && buffer && src && num_pixels > 0);
     
     /* Loop over the image channels. */
     for (channel = 0; channel < num_channels; ++channel)
@@ -250,30 +288,138 @@ void sii_gaussian_conv_image(sii_coeffs c, float *dest, float *buffer,
         const float *src_y = src;
         
         /* Filter each row of the channel. */
-        for (y = 0; y < height; ++y)
+#pragma omp parallel for
+        for (y = 0; y < ny; ++y)
         {
-            sii_gaussian_conv(c,
-                dest_y, buffer, src_y, width, 1);
-            dest_y += width;
-            src_y += width;
+            float *buffer = NULL;
+            if ((buffer = (float *)malloc(sizeof(float) * sii_buffer_size(c,
+                ((nx >= ny) ? nx : ny)))))
+            {
+              sii_gaussian_conv(c, dest + y*nx, buffer, src + y*nx, nx, 1);
+              free(buffer);
+            }
         }
         
         /* Filter each column of the channel. */
-        for (x = 0; x < width; ++x)
-            sii_gaussian_conv(c,
-                dest + x, buffer, dest + x, height, width);
-        
+#pragma omp parallel for
+        for (x = 0; x < nx; ++x)
+        {
+            float *buffer = NULL;
+            if ((buffer = (float *)malloc(sizeof(float) * sii_buffer_size(c,
+                ((nx >= ny) ? nx : ny)))))
+            {
+              sii_gaussian_conv(c, dest + x, buffer, dest + x, ny, nx);
+              free(buffer);
+            }
+        }
         dest += num_pixels;
         src += num_pixels;
     }
-    
+
     return;
 }
 
 
 /**
  *
- * Convolution with a Gaussian using Stacked Integral Images
+ * Convolution with a Gaussian using separable filters
+ *
+ */
+void std_gaussian(
+  float *I,       //input/output image
+  int   xdim,     //image width
+  int   ydim,     //image height
+  float sigma,    //Gaussian sigma
+  int   precision //defines the size of the window
+)
+{
+  int i, j, k;
+
+  double den  = 2*sigma*sigma;
+  int    size = (int) (precision*sigma)+1;
+  int    bdx  = xdim+size;
+  int    bdy  = ydim+size;
+
+  if(size>xdim) return;
+
+  //compute the coefficients of the 1D convolution kernel
+  double *B = new double[size];
+  for (int i=0; i<size; i++)
+    B[i] = 1/(sigma*sqrt(2.0*3.1415926))*exp(-i*i/den);
+
+  double norm=0;
+
+  //normalize the 1D convolution kernel
+  for (int i=0; i<size; i++)
+    norm += B[i];
+
+  norm *= 2;
+
+  norm -= B[0];
+
+  for (int i=0; i<size; i++)
+    B[i] /= norm;
+
+  //convolution of each line of the input image
+  double *R = new double[size+xdim+size];
+  for (k=0; k<ydim; k++)
+  {
+    for (i=size; i<bdx; i++)
+      R[i] = I[k*xdim+i-size];
+
+    //reflecting boundary conditions
+    for (i=0, j=bdx; i<size; i++, j++)
+    {
+      R[i] = I[k*xdim+size-i];
+      R[j] = I[k*xdim+xdim-i-1];
+    }
+
+    for (i=size; i<bdx; i++)
+    {
+      double sum = B[0]*R[i];
+
+      for (int j = 1; j < size; j++)
+        sum += B[j]*(R[i-j]+R[i+j]);
+
+      I[k*xdim+i-size] = sum;
+    }
+  }
+
+  // convolution of each column of the input image
+  double *T = new double[size+ydim+size];
+  for (k=0; k<xdim; k++)
+  {
+    for (i=size; i<bdy; i++)
+      T[i] = I[(i-size)*xdim+k];
+           
+    // Reflecting boundary conditions
+    for (i=0, j=bdy; i<size; i++, j++)
+    {
+      T[i] = I[(size-i)*xdim+k];
+      T[j] = I[(ydim-i-1)*xdim+k];
+    }
+      
+    for (i=size; i<bdy; i++)
+    {
+      double sum = B[0]*T[i];
+
+      for (j=1; j<size; j++)
+        sum += B[j]*(T[i-j]+T[i+j]);
+
+      I[(i-size)*xdim+k] = sum;
+    }
+  }
+
+  delete[]B;
+  delete[]R;
+  delete[]T;
+}
+
+
+
+/**
+ *
+ * Convolution with a Gaussian 
  *
  */
 void gaussian(
@@ -281,19 +427,23 @@ void gaussian(
   int   nx,     //image width
   int   ny,     //image height
   float sigma,  //Gaussian sigma
-  int   K       //defines the number of iterations
+  int   type,   //type of Gaussian convolution (fast, standard or none)
+  int   K       //defines the number of iterations or window precision
 )
 {
-  float *buffer = NULL;
-  sii_coeffs c;
-    
-  sii_precomp(&c, sigma, K);
-  
-  if (!(buffer = (float *)malloc(sizeof(float) * sii_buffer_size(c,
-      ((nx >= ny) ? nx : ny)))))
-      return;
-  
-  sii_gaussian_conv_image(c, I, buffer, I, nx, ny, 1);
-  free(buffer);
+  if(type==STD_GAUSSIAN)
+    //using separable filters
+    std_gaussian (I, nx, ny, sigma, K);
+  else
+  {
+    if(type==FAST_GAUSSIAN)
+    {
+      //using Stacked Integral Images
+      sii_coeffs c; 
+      sii_precomp(&c, sigma, K);
+      sii_gaussian_conv_image(c, I, I, nx, ny, 1);
+    }
+  }
 }
+
 
