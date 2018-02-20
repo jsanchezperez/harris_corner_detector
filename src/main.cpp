@@ -45,7 +45,7 @@ void print_help(char *name)
   printf("   -o name  output image with detected corners \n");
   printf("   -f name  write points to file\n");
   printf("   -s N     choose smoothing: \n"); 
-  printf("              0.slow Gaussian; 1.fast Gaussian; 2.No Gaussian\n"); 
+  printf("              0.precise Gaussian; 1.fast Gaussian; 2.no Gaussian\n"); 
   printf("              default value %d\n", PAR_DEFAULT_GAUSSIAN);
   printf("   -g N     choose gradient: \n"); 
   printf("              0.central differences; 1.Sobel operator\n"); 
@@ -62,8 +62,8 @@ void print_help(char *name)
   printf("   -t N     threshold for eliminating low values\n");
   printf("              default value %d\n", PAR_DEFAULT_THRESHOLD);
   printf("   -q N     strategy for selecting the output corners:\n");
-  printf("              0.All corners; 1.Sort all corners;\n");
-  printf("              2.N corners; 3.Distributed N corners\n");
+  printf("              0.all corners; 1.sort all corners;\n");
+  printf("              2.N corners; 3.distributed N corners\n");
   printf("              default value %d\n", PAR_DEFAULT_SELECT_STRATEGY);
   printf("   -c N     regions for output corners (1x1, 2x2,...NxN):\n");
   printf("              default value %d\n", PAR_DEFAULT_CELLS);
@@ -145,11 +145,11 @@ int read_parameters(
         if(i<argc-1)
           k=atof(argv[++i]);
 
-      if(strcmp(argv[i],"-i")==0)
+      if(strcmp(argv[i],"-d")==0)
         if(i<argc-1)
           sigma_d=atof(argv[++i]);        
         
-      if(strcmp(argv[i],"-s")==0)
+      if(strcmp(argv[i],"-i")==0)
         if(i<argc-1)
           sigma_i=atof(argv[++i]);
         

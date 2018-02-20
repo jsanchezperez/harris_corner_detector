@@ -216,7 +216,7 @@ void non_maximum_suppression(
               {
                 if(D[k*nx+l]>=D[i*nx+j])
                   found=true;
-                else skip[k*nx+l]=1;
+                
                 l++;
               }
               k++;

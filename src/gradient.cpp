@@ -14,7 +14,7 @@ void central_differences(
 )
 {
     //compute gradient in the center body
-    #pragma omp parallel for
+    //#pragma omp parallel for
     for(int i=1; i<ny-1; i++)
     {
         for(int j=1; j<nx-1; j++)
@@ -26,7 +26,7 @@ void central_differences(
     }
 
     //copy first and last rows
-    #pragma omp parallel for
+    //#pragma omp parallel for
     for(int i=1; i<nx-1; i++)
     {
       dx[i] = dx[i+nx];
@@ -34,7 +34,7 @@ void central_differences(
     }
 
     //copy first and last columns
-    #pragma omp parallel for
+    //#pragma omp parallel for
     for(int i=0; i<ny; i++)
     {
       dy[i*nx]=dy[i*nx+1];
