@@ -2,76 +2,86 @@ Yt=1.1
 
 
 #AFFINE INVARIANCE
-set terminal postscript enhanced color dashed
+set terminal postscript enhanced dashed
 set output "affine.eps"
 set yrange [0:Yt]
 set xrange [0:1]
+set xlabel "shear"
+set ylabel "repeatability rate"
 set ytics 0,0.1,Yt
-plot "../affine.txt" using 1:2 title "{/Symbol x}=0.5" with lines, "../affine.txt" using 1:4 title "{/Symbol x}=1.5" with lines, "../affine.txt" using 1:7 title "{/Symbol x}=3.0" with lines, "../affine.txt" using 1:11 title "{/Symbol x}=5.0" with lines
+plot "../affine.txt" using 1:2 title "{/Symbol e}=0.5" with lines, "../affine.txt" using 1:4 title "{/Symbol e}=1.5" with lines, "../affine.txt" using 1:7 title "{/Symbol e}=3.0" with lines, "../affine.txt" using 1:11 title "{/Symbol e}=5.0" with lines
 
 
 #GAUSSIAN GRAPHICS
-set terminal postscript enhanced color dashed
+set terminal postscript enhanced dashed
 set output "gaussian_comparison.eps"
 set key bottom
 set xrange [0:180]
 set ytics 0,0.1,Yt
+set xlabel "{rotation angle in degrees}"
 plot "../no_gaussian.txt" using ($1*180/pi):7 title "No Gaussian conv" with lines, "../std_gaussian.txt" using ($1*180/pi):7 title "Standard Gaussian conv" with lines, "../fast_gaussian.txt" using ($1*180/pi):7 title "Fast Gaussian conv" with lines
 
-set terminal postscript enhanced color dashed
+set terminal postscript enhanced dashed
 set output "gaussian_xi_std.eps" 
 set xrange [0:180]
 set ytics 0,0.1,Yt
-plot "../std_gaussian.txt" using ($1*180/pi):2 title "{/Symbol x}=0.5" with lines, "../std_gaussian.txt" using ($1*180/pi):4 title "{/Symbol x}=1.5" with lines, "../std_gaussian.txt" using ($1*180/pi):7 title "{/Symbol x}=3.0" with lines, "../std_gaussian.txt" using ($1*180/pi):11 title "{/Symbol x}=5.0" with lines
+set xlabel "{rotation angle in degrees}"
+plot "../std_gaussian.txt" using ($1*180/pi):2 title "{/Symbol e}=0.5" with lines, "../std_gaussian.txt" using ($1*180/pi):4 title "{/Symbol e}=1.5" with lines, "../std_gaussian.txt" using ($1*180/pi):7 title "{/Symbol e}=3.0" with lines, "../std_gaussian.txt" using ($1*180/pi):11 title "{/Symbol e}=5.0" with lines
 
 
-set terminal postscript enhanced color dashed
+set terminal postscript enhanced dashed
 set output "gaussian_xi_fast.eps"
 set xrange [0:180]
 set ytics 0,0.1,Yt
-plot "../fast_gaussian.txt" using ($1*180/pi):2 title "{/Symbol x}=0.5" with lines, "../fast_gaussian.txt" using ($1*180/pi):4 title "{/Symbol x}=1.5" with lines, "../fast_gaussian.txt" using ($1*180/pi):7 title "{/Symbol x}=3.0" with lines, "../fast_gaussian.txt" using ($1*180/pi):11 title "{/Symbol x}=5.0" with lines
+set xlabel "{rotation angle in degrees}"
+plot "../fast_gaussian.txt" using ($1*180/pi):2 title "{/Symbol e}=0.5" with lines, "../fast_gaussian.txt" using ($1*180/pi):4 title "{/Symbol e}=1.5" with lines, "../fast_gaussian.txt" using ($1*180/pi):7 title "{/Symbol e}=3.0" with lines, "../fast_gaussian.txt" using ($1*180/pi):11 title "{/Symbol e}=5.0" with lines
 
 
 #GRADIENT GRAPHICS
-set terminal postscript enhanced color dashed
+set terminal postscript enhanced dashed
 set output "gradient_comparison.eps"
+set xlabel "{rotation angle in degrees}"
 set xrange [0:180]
 set ytics 0,0.1,Yt
 plot "../sobel_gradient.txt" using ($1*180/pi):5 title "Sobel operator" with lines, "../central_gradient.txt" using ($1*180/pi):5 title "Central differences" with lines
 
 
 #ROTATION INVARIANCE
-set terminal postscript enhanced color dashed
+set terminal postscript enhanced dashed
 set output "rotation.eps"
+set xlabel "{rotation angle in degrees}"
 set xrange [0:180]
 set ytics 0,0.1,Yt
-plot "../rotation.txt" using ($1*180/pi):2 title "{/Symbol x}=0.5" with lines, "../rotation.txt" using ($1*180/pi):4 title "{/Symbol x}=1.5" with lines, "../rotation.txt" using ($1*180/pi):7 title "{/Symbol x}=3.0" with lines, "../rotation.txt" using ($1*180/pi):11 title "{/Symbol x}=5.0" with lines
+plot "../rotation.txt" using ($1*180/pi):2 title "{/Symbol e}=0.5" with lines, "../rotation.txt" using ($1*180/pi):4 title "{/Symbol e}=1.5" with lines, "../rotation.txt" using ($1*180/pi):7 title "{/Symbol e}=3.0" with lines, "../rotation.txt" using ($1*180/pi):11 title "{/Symbol e}=5.0" with lines
 
 
 #NOISE INVARIANCE
-set terminal postscript enhanced color dashed
+set terminal postscript enhanced dashed
 set output "noise.eps"
 set key top
 set xrange [0:30]
 set ytics 0,0.1,Yt
-plot "../noise.txt" using 1:2 title "{/Symbol x}=0.5" with lines, "../noise.txt" using 1:4 title "{/Symbol x}=1.5" with lines, "../noise.txt" using 1:7 title "{/Symbol x}=3.0" with lines, "../noise.txt" using 1:11 title "{/Symbol x}=5.0" with lines
+set xlabel "{standard deviation of the Gaussian noise ({/Symbol s})}"
+plot "../noise.txt" using 1:2 title "{/Symbol e}=0.5" with lines, "../noise.txt" using 1:4 title "{/Symbol e}=1.5" with lines, "../noise.txt" using 1:7 title "{/Symbol e}=3.0" with lines, "../noise.txt" using 1:11 title "{/Symbol e}=5.0" with lines
 
 
 #ILLUMINATION INVARIANCE
-set terminal postscript enhanced color dashed
+set terminal postscript enhanced dashed
 set output "illumination.eps"
 set key top
 set key autotitle columnhead
 set xrange [0:6]
-plot "../light.txt" using 1:2 title "{/Symbol x}=0.5" with lines, "../light.txt" using 1:4 title "{/Symbol x}=1.5" with lines, "../light.txt" using 1:7 title "{/Symbol x}=3.0" with lines, "../light.txt" using 1:11 title "{/Symbol x}=5.0" with lines
+set xlabel "intensity scale"
+plot "../light.txt" using 1:2 title "{/Symbol e}=0.5" with lines, "../light.txt" using 1:4 title "{/Symbol e}=1.5" with lines, "../light.txt" using 1:7 title "{/Symbol e}=3.0" with lines, "../light.txt" using 1:11 title "{/Symbol e}=5.0" with lines
 
 
 #SCALE INVARIANCE
-set terminal postscript enhanced color dashed
+set terminal postscript enhanced dashed
 set output "scale.eps"
 set key autotitle columnhead
 set xrange [0:4]
-plot "../scale.txt" using 1:2 title "{/Symbol x}=0.5" with lines, "../scale.txt" using 1:4 title "{/Symbol x}=1.5" with lines, "../scale.txt" using 1:7 title "{/Symbol x}=3.0" with lines, "../scale.txt" using 1:11 title "{/Symbol x}=5.0" with lines
+set xlabel "{scale factor}"
+plot "../scale.txt" using 1:2 title "{/Symbol e}=0.5" with lines, "../scale.txt" using 1:4 title "{/Symbol e}=1.5" with lines, "../scale.txt" using 1:7 title "{/Symbol e}=3.0" with lines, "../scale.txt" using 1:11 title "{/Symbol e}=5.0" with lines
 
 
 

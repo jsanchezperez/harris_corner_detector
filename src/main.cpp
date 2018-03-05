@@ -8,6 +8,7 @@
 #include "harris.h"
 #include "gaussian.h"
 #include "gradient.h"
+#include "interpolation.h"
 
 extern "C"
 {
@@ -24,9 +25,8 @@ extern "C"
 #define PAR_DEFAULT_SELECT_STRATEGY ALL_CORNERS
 #define PAR_DEFAULT_CELLS 3
 #define PAR_DEFAULT_NSELECT 2000
-#define PAR_DEFAULT_SUBPIXEL_PRECISION 0
+#define PAR_DEFAULT_PRECISION QUADRATIC_APPROXIMATION
 #define PAR_DEFAULT_VERBOSE 0
-
 
 /**
  *
@@ -69,7 +69,9 @@ void print_help(char *name)
   printf("              default value %d\n", PAR_DEFAULT_CELLS);
   printf("   -n N     number of output corners\n");
   printf("              default value %d\n", PAR_DEFAULT_NSELECT);
-  printf("   -p       subpixel precision through quadratic interpolation\n");
+  printf("   -p N     subpixel precision\n");
+  printf("              1.quadratic approximation; 2.quartic interpolation\n");
+  printf("              default value %d\n", PAR_DEFAULT_PRECISION);
   printf("   -v       switch on verbose mode \n");
 }
 
@@ -95,7 +97,7 @@ int read_parameters(
   int   &strategy,
   int   &cells,
   int   &Nselect,
-  int   &subpixel_precision,  
+  int   &precision,  
   int   &verbose
 )
 {
@@ -118,7 +120,7 @@ int read_parameters(
     strategy=PAR_DEFAULT_SELECT_STRATEGY;
     cells=PAR_DEFAULT_CELLS;
     Nselect=PAR_DEFAULT_NSELECT;
-    subpixel_precision=PAR_DEFAULT_SUBPIXEL_PRECISION;
+    precision=PAR_DEFAULT_PRECISION;
     verbose=PAR_DEFAULT_VERBOSE;
     
     //read each parameter from the command line
@@ -170,7 +172,8 @@ int read_parameters(
           Nselect=atoi(argv[++i]);
 
       if(strcmp(argv[i],"-p")==0)
-        subpixel_precision=1;
+        if(i<argc-1)
+          precision=atoi(argv[++i]);
 
       if(strcmp(argv[i],"-v")==0)
         verbose=1;
@@ -322,13 +325,13 @@ int main(int argc, char *argv[])
   char  *image, *out_image=NULL, *out_file=NULL;
   float k, sigma_d, sigma_i, threshold;
   int   gaussian, gradient, strategy, Nselect, measure;
-  int   subpixel_precision, cells, verbose;
+  int   precision, cells, verbose;
 
   //read the parameters from the console
   int result=read_parameters(
         argc, argv, &image, &out_image, &out_file, 
         gaussian, gradient, measure, k, sigma_d, sigma_i, threshold, 
-        strategy, cells, Nselect, subpixel_precision, verbose
+        strategy, cells, Nselect, precision, verbose
       );
 
   if(result)
@@ -342,9 +345,10 @@ int main(int argc, char *argv[])
         "  input image: '%s', output image: '%s', output corner file: %s\n"
         "  gaussian: %d, gradient: %d, measure: %d, K: %f, sigma_d: %f  \n"
         "  sigma_i: %f, threshold: %f, strategy: %d, Number of cells: %d\n"
-        "  Nselect: %d, nx: %d, ny: %d, nz: %d\n",
+        "  Nselect: %d, precision: %d, nx: %d, ny: %d, nz: %d\n",
         image, out_image, out_file, gaussian, gradient, measure, k, 
-        sigma_d, sigma_i, threshold, strategy, cells, Nselect, nx, ny, nz
+        sigma_d, sigma_i, threshold, strategy, cells, Nselect, 
+        precision, nx, ny, nz
       );
 
     if (Ic!=NULL)
@@ -367,7 +371,7 @@ int main(int argc, char *argv[])
       harris(
         I, corners, gaussian, gradient, measure, k, sigma_d, 
         sigma_i, threshold, strategy, cells, Nselect, 
-        subpixel_precision, nx, ny, verbose
+        precision, nx, ny, verbose
       );
 
       if (verbose) 

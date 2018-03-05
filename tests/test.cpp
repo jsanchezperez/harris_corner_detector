@@ -7,6 +7,7 @@
 #include "../src/gaussian.h"
 #include "../src/gradient.h"
 #include "bicubic_interpolation.h"
+#include "harris_opencv.h"
 
 extern "C"
 {
@@ -26,7 +27,6 @@ extern "C"
 #define RADIUS 2*SIGMA_I
 
 using namespace std;
-
 
 
 
@@ -282,7 +282,6 @@ void draw_points(
 }
 
 
-
 /**
  *
  *  Execute tests for repeatability
@@ -296,6 +295,7 @@ void create_graphic(
   int    NTOL,
   int    type,
   const char *file_name,
+  int    opencv=0,
   int    parameter=0
 )
 {
@@ -305,16 +305,18 @@ void create_graphic(
  int   gaussian=FAST_GAUSSIAN;
  int   gradient=CENTRAL_DIFFERENCES;
  int   measure=HARRIS_MEASURE;
- float k=0.04;
- float sigma_d=0.8;
+ float k=0.06;
+ float sigma_d=1.0;
  float sigma_i=SIGMA_I;
- float threshold=30;
+ float threshold=10;
  int   strategy=ALL_CORNERS;
  int   cells=1;
- int   Nselect=500;
- int   subpixel_precision=0;
- int   verbose=0;
-  
+ int   Nselect=2000;
+ int   subpixel_precision=1;
+ int   verbose=1;
+ 
+ if(opencv) threshold*=5500;
+ 
  if (Ic!=NULL)
  {
    std::vector<harris_corner> corners0;
@@ -425,11 +427,18 @@ void create_graphic(
         else 
           for(int l=0; l<nx*ny; l++) II[l]=Ii[l];
 
-        harris(
-          II, corners0, gaussian, gradient, measure, k, sigma_d, sigma_i, 
-          threshold, strategy, cells, Nselect, subpixel_precision, 
-          nx, ny, verbose
-        );
+        if(opencv)
+          opencv_harris(
+            II, corners0, k, sigma_d, sigma_i, 
+            threshold, strategy, cells, Nselect, subpixel_precision, 
+            nx, ny, verbose
+          ); 
+        else
+          harris(
+            II, corners0, gaussian, gradient, measure, k, sigma_d, sigma_i, 
+            threshold, strategy, cells, Nselect, subpixel_precision, 
+            nx, ny, verbose
+          );
         delete []II;
       }
 
@@ -437,18 +446,25 @@ void create_graphic(
       if(type!=NOISE)
         add_noise(Ii, Ii, 2, nx*ny);
 
-      harris(
-        Ii, cornersi, gaussian, gradient, measure, k, sigma_d, sigma_i, 
-        threshold, strategy, cells, Nselect, subpixel_precision, 
-        nx, ny, verbose
-      );
+      if(opencv)
+        opencv_harris(
+          Ii, cornersi, k, sigma_d, sigma_i, 
+          threshold, strategy, cells, Nselect, subpixel_precision, 
+          nx, ny, verbose
+        ); 
+      else
+        harris(
+          Ii, cornersi, gaussian, gradient, measure, k, sigma_d, sigma_i, 
+          threshold, strategy, cells, Nselect, subpixel_precision, 
+          nx, ny, verbose
+        );
       
       
-      /*char name[200];
+      char name[200];
       draw_points(Ii, cornersi, strategy, cells, nx, ny, 1, 2*sigma_i);
       sprintf(name, "tmp/image%.4d.png",i);
       iio_save_image_float_vec(name, Ii, nx, ny, 1);
-      */
+      
       
       fprintf(file,"%lf ", alpha[i]);
       printf("%lf ", alpha[i]);
@@ -489,6 +505,7 @@ int main(int argc, char *argv[])
    double TOL[10] = {0.5,1.0,1.5,2.0,2.5,3.0,3.5,4.0,4.5,5.0};
    double inc;
    double alpha[N];
+   int opencv = 1; 
 
 
    //affine-graphic for a range of xi-repeatability
@@ -499,7 +516,7 @@ int main(int argc, char *argv[])
    for(int i=1; i<N; i++)
       affine[i]=affine[i-1]+inc;
       
-   create_graphic(argv[1], affine, N, TOL, NTOL, AFFINE, "affine.txt");
+   create_graphic(argv[1], affine, N, TOL, NTOL, AFFINE, "affine.txt", opencv);
 
 //return 0;   
 
@@ -512,7 +529,7 @@ int main(int argc, char *argv[])
       illumination[i]=illumination[i-1]+inc;
     
    create_graphic(
-     argv[1], illumination, N, TOL, NTOL, ILLUMINATION, "light.txt"
+     argv[1], illumination, N, TOL, NTOL, ILLUMINATION, "light.txt", opencv
    );
 
 //return 0;
@@ -525,7 +542,7 @@ int main(int argc, char *argv[])
    for(int i=1; i<N; i++)
      noise[i]=noise[i-1]+inc;
     
-   create_graphic(argv[1], noise, N, TOL, NTOL, NOISE, "noise.txt");
+   create_graphic(argv[1], noise, N, TOL, NTOL, NOISE, "noise.txt", opencv);
 
 //return 0;   
 
@@ -538,7 +555,7 @@ int main(int argc, char *argv[])
    for(int i=2; i<N; i++)
      scales[i]=scales[i-1]+inc;
     
-   create_graphic(argv[1], scales, N, TOL, NTOL, SCALE, "scale.txt");
+   create_graphic(argv[1], scales, N, TOL, NTOL, SCALE, "scale.txt", opencv);
 
 //return 0;   //comparing central differences and sobel operator 
 
@@ -550,11 +567,11 @@ int main(int argc, char *argv[])
     
    create_graphic(
      argv[1], alpha, N, TOL, NTOL, GRADIENT, 
-     "central_gradient.txt", CENTRAL_DIFFERENCES
+     "central_gradient.txt", opencv, CENTRAL_DIFFERENCES
    );
    create_graphic(
      argv[1], alpha, N, TOL, NTOL, GRADIENT, 
-     "sobel_gradient.txt", SOBEL_OPERATOR
+     "sobel_gradient.txt", opencv, SOBEL_OPERATOR
    );
    
    
@@ -568,13 +585,16 @@ int main(int argc, char *argv[])
      alpha[i]=alpha[i-1]+inc;
     
   create_graphic(
-     argv[1], alpha, N, TOL, NTOL, GAUSSIAN, "std_gaussian.txt", STD_GAUSSIAN
+     argv[1], alpha, N, TOL, NTOL, GAUSSIAN, 
+     "std_gaussian.txt", opencv, STD_GAUSSIAN
    );
    create_graphic(
-     argv[1], alpha, N, TOL, NTOL, GAUSSIAN, "fast_gaussian.txt", FAST_GAUSSIAN
+     argv[1], alpha, N, TOL, NTOL, GAUSSIAN, 
+     "fast_gaussian.txt", opencv, FAST_GAUSSIAN
    );
    create_graphic(
-     argv[1], alpha, N, TOL, NTOL, GAUSSIAN, "no_gaussian.txt", NO_GAUSSIAN
+     argv[1], alpha, N, TOL, NTOL, GAUSSIAN, 
+     "no_gaussian.txt", opencv, NO_GAUSSIAN
    );
    
    
@@ -587,11 +607,11 @@ int main(int argc, char *argv[])
    for(int i=1; i<N; i++)
      alpha[i]=alpha[i-1]+inc;
     
-   create_graphic(argv[1], alpha, N, TOL, NTOL, ROTATION, "rotation.txt");
+   create_graphic(
+     argv[1], alpha, N, TOL, NTOL, ROTATION, "rotation.txt", opencv
+   );
 
 //return 0;
-
-
 
 }
 

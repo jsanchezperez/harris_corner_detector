@@ -2,6 +2,8 @@ CC=gcc
 CXX=g++
 CFLAGS=-O3 #-Wall -Wextra -Werror #-fopenmp -mavx -ffast-math 
 LFLAGS=-lpng -ljpeg -ltiff -lm 
+CVFLAGS=$(shell pkg-config --cflags --libs opencv)
+
 
 all: bin obj bin/test
 
@@ -29,11 +31,14 @@ obj/harris.o: ../src/harris.cpp
 obj/bicubic_interpolation.o: bicubic_interpolation.cpp
 	$(CXX) -c $< -o $@ -std=c++11 $(CFLAGS) -Wno-unused -pedantic -DNDEBUG -D_GNU_SOURCE 
 
+obj/harris_opencv.o: harris_opencv.cpp
+	$(CXX) -c $< -o $@ -std=c++11 $(CFLAGS) -Wno-unused -pedantic -DNDEBUG -D_GNU_SOURCE 
+
 
 	
 # ------- test -------
-bin/test: test.cpp obj/bicubic_interpolation.o obj/harris.o obj/iio.o obj/gradient.o obj/gaussian.o obj/interpolation.o
-	$(CXX) -std=c++11 -o $@ $^ $(CFLAGS) $(LFLAGS)
+bin/test: test.cpp obj/bicubic_interpolation.o obj/harris.o obj/iio.o obj/gradient.o obj/gaussian.o obj/interpolation.o obj/harris_opencv.o
+	$(CXX) -std=c++11 -o $@ $^ $(CFLAGS) $(LFLAGS) $(CVFLAGS)
 
 	
 clean:

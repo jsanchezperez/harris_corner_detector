@@ -1,10 +1,55 @@
 #include "interpolation.h"
 
 #include <stdio.h>
+#include <math.h>
 
-#define MAX_ITERATIONS 100
+#define MAX_ITERATIONS 20
+
 
 /**
+  *
+  * QUADRATIC APPROXIMATION
+  *
+  * Approximate function as
+  * 
+  * f(x)=f + Df^T x + 1/2 x^T DDf x
+  *
+**/
+bool quadratic_approximation(
+  float *M,  //values of the interpolation function (9 values)
+  float &x,  //corner x-position
+  float &y,  //corner y-position
+  float &Mo  //maximum of the interpolation function
+)
+{
+  float fx  = 0.5*(M[5]-M[3]);
+  float fy  = 0.5*(M[7]-M[1]);
+  float fxx = (M[5]-2*M[4]+M[3]);
+  float fyy = (M[7]-2*M[4]+M[1]);
+  float fxy = 0.25*(M[0]-M[2]-M[6]+M[8]);
+  
+  //check invertibility
+  float det = fxx*fyy-fxy*fxy;
+   
+  if(det*det<1E-6)
+    return false;
+  else
+  {
+    //compute the new position and value
+    float dx = (fyy*fx-fxy*fy)/det;
+    float dy = (fxx*fy-fxy*fx)/det;
+    x-=dx; y-=dy;
+    Mo=M[4]+fx*dx+fy*dy+0.5*(fxx*dx*dx+2*dx*dy*fxy+fyy*dy*dy+2*dx*dy*fxy);
+    return true;
+  }
+}
+
+
+
+
+/**
+  *
+  * QUARTIC INTERPOLATION
   *
   * Evaluate the function in (x,y)
   * 
@@ -99,7 +144,7 @@ bool solve(
 {
   float det=H[0]*H[2]-H[1]*H[1];
   
-  if(det*det<10E-10)
+  if(det*det<1E-10)
     return false;
   else{
     b[0]=(D[0]*H[2]-D[1]*H[1])/det;
@@ -114,7 +159,7 @@ bool solve(
   * Apply Newton method to find maximum of the interpolation function
   *
 **/
-bool maximum_interpolation(
+bool quartic_interpolation(
   float *M,  //values of the interpolation function (9 values)
   float &x,  //corner x-position
   float &y,  //corner y-position
@@ -135,7 +180,7 @@ bool maximum_interpolation(
     Hessian(dx,dy,a,H);
     
     //solve the system for estimating the next increment
-    if(!solve(H,D,b)) 
+    if(!solve(H,D,b))
       return false;
     
     //move the current position
@@ -147,8 +192,8 @@ bool maximum_interpolation(
   while(D[0]*D[0]+D[1]*D[1]>TOL && i<MAX_ITERATIONS);
   
   //check that (dx, dy) are inside the allowed boundaries 
-  if(dx>1 || dx<-1 || dy>1 || dy<-1)
-    return false;
+  if(dx>1 || dx<-1 || dy>1 || dy<-1 || isnan(dx) || isnan(dy))
+    return false;    
   else
   {
     //compute the new position and value

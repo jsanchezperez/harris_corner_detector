@@ -314,9 +314,10 @@ void select_output_corners(
   *
 **/
 void compute_subpixel_precision(
-  float *Mc,  // discriminant function
+  float *Mc, // discriminant function
   vector<harris_corner> &corners, // selected corners
-  int nx
+  int nx,    // number of columns of the image
+  int type   // type of interpolation (quadratic or quartic)
 )
 {
   #pragma omp parallel for
@@ -340,8 +341,20 @@ void compute_subpixel_precision(
     M[6]=Mc[dy*nx+mx];
     M[7]=Mc[dy*nx+(int)x];
     M[8]=Mc[dy*nx+dx];
+       
+    //printf("c: %f, %f %f\n", corners[i].x, corners[i].y, corners[i].Mc);
     
-    maximum_interpolation(M, corners[i].x, corners[i].y, corners[i].Mc);
+    if(type==QUADRATIC_APPROXIMATION)
+      quadratic_approximation(
+        M, corners[i].x, corners[i].y, corners[i].Mc
+      );
+    else if(type==QUARTIC_INTERPOLATION)
+      quartic_interpolation(
+        M, corners[i].x, corners[i].y, corners[i].Mc
+      );
+    
+    //printf("   %f, %f %f\n", corners[i].x, corners[i].y, corners[i].Mc);
+    
   }   
 }
 
@@ -364,7 +377,7 @@ void harris(
   int   strategy,  // strategy for the output corners
   int   cells,     // number of regions in the image for distributed output
   int   Nselect,   // number of output corners
-  int   precision, // enable subpixel precision
+  int   precision, // type of subpixel precision approximation
   int   nx,        // number of columns of the image
   int   ny,        // number of rows of the image
   int   verbose    // activate verbose mode
@@ -467,7 +480,12 @@ void harris(
     #pragma omp parallel for
     for(int i=0; i<size; i++)
       if(Mc[i]<Th) Mc[i]=0;
+  
     
+  //char name[200]= "harris_opencv.png";
+  //iio_save_image_float_vec(name, Mc, nx, ny, 1);
+      
+
       
   if (verbose) 
   {
@@ -507,7 +525,7 @@ void harris(
             end.tv_usec - start.tv_usec) / 1.e6);
   }
 
-  if(precision)
+  if(precision==QUADRATIC_APPROXIMATION || precision==QUARTIC_INTERPOLATION)
   {
     if (verbose)
     {
@@ -516,7 +534,7 @@ void harris(
     }
 
     //calculate subpixel precision
-    compute_subpixel_precision(Mc, corners, nx);
+    compute_subpixel_precision(Mc, corners, nx, precision);
 
     if (verbose)
     {      

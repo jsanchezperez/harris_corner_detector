@@ -28,6 +28,48 @@ struct harris_corner{
 
 /**
   *
+  * Function for non-maximum suppression
+  *
+**/
+void non_maximum_suppression(
+  float *D,             // input image
+  std::vector<harris_corner> &corners, // Harris' corners
+  int   radius,         // window radius
+  int   nx,             // number of columns of the image
+  int   ny              // number of rows of the image
+);
+
+
+/**
+  *
+  * Function for selecting the output corners
+  *
+**/    
+void select_output_corners(
+  std::vector<harris_corner> &corners, // output selected corners
+  int strategy, // strategy for the output corners
+  int cells,           // number of regions in the image for distributed output
+  int Nselect,         // number of output corners
+  int nx,              // number of columns of the image
+  int ny               // number of rows of the image
+);
+
+
+/**
+  *
+  * Function for computing subpixel precision of maxima
+  *
+**/
+void compute_subpixel_precision(
+  float *Mc, // discriminant function
+  std::vector<harris_corner> &corners, // selected corners
+  int nx,    // number of columns of the image
+  int type   // type of interpolation (quadratic or quartic)
+);
+
+
+/**
+  *
   * Main function for computing Harris corners
   *
 **/
