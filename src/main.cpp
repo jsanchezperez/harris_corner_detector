@@ -69,8 +69,9 @@ void print_help(char *name)
   printf("              default value %d\n", PAR_DEFAULT_CELLS);
   printf("   -n N     number of output corners\n");
   printf("              default value %d\n", PAR_DEFAULT_NSELECT);
-  printf("   -p N     subpixel precision\n");
-  printf("              0.quadratic approximation; 1.quartic interpolation\n");
+  printf("   -p N     subpixel accuracy\n");
+  printf("              0.no subpixel; 1.quadratic approximation;"
+                      " 2.quartic interpolation\n");
   printf("              default value %d\n", PAR_DEFAULT_PRECISION);
   printf("   -v       switch on verbose mode \n");
 }
