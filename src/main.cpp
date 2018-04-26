@@ -70,7 +70,7 @@ void print_help(char *name)
   printf("   -n N     number of output corners\n");
   printf("              default value %d\n", PAR_DEFAULT_NSELECT);
   printf("   -p N     subpixel precision\n");
-  printf("              1.quadratic approximation; 2.quartic interpolation\n");
+  printf("              0.quadratic approximation; 1.quartic interpolation\n");
   printf("              default value %d\n", PAR_DEFAULT_PRECISION);
   printf("   -v       switch on verbose mode \n");
 }

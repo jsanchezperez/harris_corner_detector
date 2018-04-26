@@ -1,5 +1,9 @@
 gnuplot graphics.plg
 
+ps2pdf subpixel_accuracy.eps subpixel_accuracy_$1.pdf
+ps2pdf subpixel_quadratic.eps subpixel_quadratic_$1.pdf
+ps2pdf subpixel_quartic.eps subpixel_quartic_$1.pdf
+ps2pdf affine.eps affine_$1.pdf
 ps2pdf affine.eps affine_$1.pdf
 ps2pdf gaussian_comparison.eps gaussian_comparison_$1.pdf
 ps2pdf gaussian_xi_std.eps gaussian_xi_std_$1.pdf

@@ -529,7 +529,7 @@ void harris(
   {
     if (verbose)
     {
-       printf(" 8.Computing subpixel precision: \t");
+       printf(" 8.Computing subpixel accuracy: \t");
        gettimeofday(&start, NULL);
     }
 

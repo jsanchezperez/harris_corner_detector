@@ -6,6 +6,7 @@
 #include "../src/harris.h"
 #include "../src/gaussian.h"
 #include "../src/gradient.h"
+#include "../src/interpolation.h"
 #include "bicubic_interpolation.h"
 #include "harris_opencv.h"
 
@@ -22,7 +23,9 @@ extern "C"
 #define NOISE 4
 #define GAUSSIAN 5
 #define GRADIENT 6
+#define SUBPIXEL 7
 
+#define SIGMA_D 1
 #define SIGMA_I 2.5
 #define RADIUS 2*SIGMA_I
 
@@ -306,13 +309,13 @@ void create_graphic(
  int   gradient=CENTRAL_DIFFERENCES;
  int   measure=HARRIS_MEASURE;
  float k=0.06;
- float sigma_d=1.0;
+ float sigma_d=SIGMA_D;
  float sigma_i=SIGMA_I;
- float threshold=10;
+ float threshold=30;
  int   strategy=ALL_CORNERS;
  int   cells=1;
  int   Nselect=2000;
- int   subpixel_precision=1;
+ int   subpixel_precision=0;
  int   verbose=1;
  
  if(opencv) threshold*=5500;
@@ -415,6 +418,17 @@ void create_graphic(
             else if(Ii[l]>255) Ii[l]=255;
           } 
           break;
+          
+        case SUBPIXEL:
+          nparams=3;
+          float x=nx/2.-0.5;
+          float y=ny/2.-0.5;
+          T[2]=alpha[i];
+          T[0]=-cos(T[2])*x+sin(T[2])*y+x;
+          T[1]=-sin(T[2])*x-cos(T[2])*y+y;
+          bicubic_interpolation(I, Ii, T, nparams, nx, ny, 1);
+          subpixel_precision=parameter;
+          break;
       }
 
       //compute the reference set
@@ -505,7 +519,26 @@ int main(int argc, char *argv[])
    double TOL[10] = {0.5,1.0,1.5,2.0,2.5,3.0,3.5,4.0,4.5,5.0};
    double inc;
    double alpha[N];
-   int opencv = 1; 
+   int opencv = 0; 
+
+   //rotation-graphic for a range of xi-repeatability
+   printf("Generating subpixel graphics:\n");
+   inc=PI/(N-1.0);
+   alpha[0]=0;
+   for(int i=1; i<N; i++)
+     alpha[i]=alpha[i-1]+inc;
+    
+   create_graphic(
+     argv[1], alpha, N, TOL, NTOL, SUBPIXEL, 
+     "subpixel_quadratic.txt", opencv, QUADRATIC_APPROXIMATION
+   );
+   
+   create_graphic(
+     argv[1], alpha, N, TOL, NTOL, SUBPIXEL, 
+     "subpixel_quartic.txt", opencv, QUARTIC_INTERPOLATION
+   );
+
+   return 0;
 
 
    //affine-graphic for a range of xi-repeatability
