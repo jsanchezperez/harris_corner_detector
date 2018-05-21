@@ -51,7 +51,7 @@ bool quadratic_approximation(
   *
   * QUARTIC INTERPOLATION
   *
-  * Evaluate the function in (x,y)
+  * Evaluate function in (x,y)
   * 
   * f(x)=a0 x^2y^2 + a1 x^2y + a2 xy^2 + a3 x^2 + a4 y^2 +
   *      a5 xy + a6 x + a7 y + a8
@@ -202,33 +202,4 @@ bool quartic_interpolation(
   }
 }
 
-float G(float x, float y)
-{
- float mx=-0.95;
- float my=0.95;
- float r=(-(x-mx)*(x-mx)-(y-my)*(y-my));
- printf("f(%f, %f)=%f\n", x, y, r);
- return r;
-}
 
-
-/*void main()
-{
- float M[9],x=0,y=0;
- int i;
- M[0]=G(-1.,-1.) ;
- M[1]=G(0.,-1.);
- M[2]=G(1.,-1.);
-
- M[3]=G(-1.,0.);
- M[4]=G(0.,0.);
- M[5]=G(1.,0.);
-
- M[6]=G(-1.,1.);
- M[7]=G(0.,1.);
- M[8]=G(1.,1.);
-
- if(maximum_interpolation(M, x, y))
-     printf("Resultado = %f, %f \n",x,y);
-
-}*/

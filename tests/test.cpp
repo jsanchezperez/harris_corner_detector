@@ -2,6 +2,7 @@
 #include<vector>
 #include<cmath>
 #include <random>
+#include <omp.h>
 
 #include "../src/harris.h"
 #include "../src/gaussian.h"
@@ -311,11 +312,11 @@ void create_graphic(
  float k=0.06;
  float sigma_d=SIGMA_D;
  float sigma_i=SIGMA_I;
- float threshold=30;
- int   strategy=ALL_CORNERS;
+ float threshold=0;//30;
+ int   strategy=N_CORNERS; //DISTRIBUTED_N_CORNERS //ALL_CORNERS;
  int   cells=1;
- int   Nselect=2000;
- int   subpixel_precision=0;
+ int   Nselect=1500;
+ int   subpixel_precision=1;
  int   verbose=1;
  
  if(opencv) threshold*=5500;
@@ -522,34 +523,28 @@ int main(int argc, char *argv[])
    int opencv = 0; 
 
    //rotation-graphic for a range of xi-repeatability
-   printf("Generating subpixel graphics:\n");
+   printf("Generating rotation graphics:\n");
    inc=PI/(N-1.0);
    alpha[0]=0;
    for(int i=1; i<N; i++)
      alpha[i]=alpha[i-1]+inc;
     
    create_graphic(
-     argv[1], alpha, N, TOL, NTOL, SUBPIXEL, 
-     "subpixel_quadratic.txt", opencv, QUADRATIC_APPROXIMATION
-   );
-   
-   create_graphic(
-     argv[1], alpha, N, TOL, NTOL, SUBPIXEL, 
-     "subpixel_quartic.txt", opencv, QUARTIC_INTERPOLATION
+     argv[1], alpha, N, TOL, NTOL, ROTATION, "rotation.txt", opencv
    );
 
    return 0;
 
 
-   //affine-graphic for a range of xi-repeatability
-   printf("Generating affine graphics:\n");
-   double affine[N];
-   inc=1/(N-2.0);
-   affine[0]=0; 
+   //noise-graphic for a range of xi-repeatability
+   printf("Generating noise graphics:\n");
+   double noise[N];
+   inc=30./N;
+   noise[0]=0;
    for(int i=1; i<N; i++)
-      affine[i]=affine[i-1]+inc;
-      
-   create_graphic(argv[1], affine, N, TOL, NTOL, AFFINE, "affine.txt", opencv);
+     noise[i]=noise[i-1]+inc;
+    
+   create_graphic(argv[1], noise, N, TOL, NTOL, NOISE, "noise.txt", opencv);
 
 //return 0;   
 
@@ -567,15 +562,15 @@ int main(int argc, char *argv[])
 
 //return 0;
 
-   //noise-graphic for a range of xi-repeatability
-   printf("Generating noise graphics:\n");
-   double noise[N];
-   inc=30./N;
-   noise[0]=0;
+   //affine-graphic for a range of xi-repeatability
+   printf("Generating affine graphics:\n");
+   double affine[N];
+   inc=1/(N-2.0);
+   affine[0]=0; 
    for(int i=1; i<N; i++)
-     noise[i]=noise[i-1]+inc;
-    
-   create_graphic(argv[1], noise, N, TOL, NTOL, NOISE, "noise.txt", opencv);
+      affine[i]=affine[i-1]+inc;
+      
+   create_graphic(argv[1], affine, N, TOL, NTOL, AFFINE, "affine.txt", opencv);
 
 //return 0;   
 
@@ -590,8 +585,29 @@ int main(int argc, char *argv[])
     
    create_graphic(argv[1], scales, N, TOL, NTOL, SCALE, "scale.txt", opencv);
 
-//return 0;   //comparing central differences and sobel operator 
+   //return 0;     
 
+   //subpixel-graphic for a range of xi-repeatability
+   printf("Generating subpixel graphics:\n");
+   inc=PI/(N-1.0);
+   alpha[0]=0;
+   for(int i=1; i<N; i++)
+     alpha[i]=alpha[i-1]+inc;
+    
+   create_graphic(
+     argv[1], alpha, N, TOL, NTOL, SUBPIXEL, 
+     "subpixel_quadratic.txt", opencv, QUADRATIC_APPROXIMATION
+   );
+   
+   create_graphic(
+     argv[1], alpha, N, TOL, NTOL, SUBPIXEL, 
+     "subpixel_quartic.txt", opencv, QUARTIC_INTERPOLATION
+   );
+
+   //return 0;
+
+
+   //comparing central differences and sobel operator 
    printf("Generating gradient graphics:\n");
    inc=PI/(N-1.0);
    alpha[0]=0;
@@ -631,19 +647,6 @@ int main(int argc, char *argv[])
    );
    
    
-//return 0;
-
-   //rotation-graphic for a range of xi-repeatability
-   printf("Generating rotation graphics:\n");
-   inc=PI/(N-1.0);
-   alpha[0]=0;
-   for(int i=1; i<N; i++)
-     alpha[i]=alpha[i-1]+inc;
-    
-   create_graphic(
-     argv[1], alpha, N, TOL, NTOL, ROTATION, "rotation.txt", opencv
-   );
-
 //return 0;
 
 }

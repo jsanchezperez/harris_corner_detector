@@ -48,7 +48,7 @@ void compute_autocorrelation_matrix(
 
 )
 {
-#pragma omp parallel for
+  #pragma omp parallel for
   for (int i=0;i<nx*ny;i++)
   {
      A[i] = Ix[i]*Ix[i];
@@ -152,7 +152,11 @@ void non_maximum_suppression(
 {
   int *skip  = new int[nx*ny]();
   int size   = (2*radius+1)*(2*radius+1)-2*radius-1;
+  
+  //use an array for each row to allow parallel processing
+  vector<vector<harris_corner> > corners_row(ny-2*radius);
  
+  #pragma omp parallel for
   for(int i=radius; i<ny-radius; i++)
   {
     int j=radius;
@@ -224,13 +228,17 @@ void non_maximum_suppression(
             
             if(!found)
               //a new local maximum detected
-              corners.push_back({(float)j, (float)i, D[i*nx+j]});
+              corners_row[i-radius].push_back({(float)j, (float)i, D[i*nx+j]});
           }
         }
         j=p1;
       }
     }
   }
+  
+  //copy row corners to the output list
+  for(int i=0; i<ny-2*radius; i++)
+   corners.insert(corners.end(), corners_row[i].begin(), corners_row[i].end());
   
   delete []skip;
 }
@@ -391,10 +399,10 @@ void harris(
   
   if (verbose)
   {
-     printf("\n\nHarris corner detection:\n");
-     printf(" 1.Convolving image with Gaussian: \t");
+    printf("\n\nHarris corner detection:\n");
+    printf(" 1.Convolving image with Gaussian: \t");
     
-     gettimeofday(&start, NULL);    
+    gettimeofday(&start, NULL);    
   }
 
   //smooth the original image to reduce noise
@@ -402,11 +410,13 @@ void harris(
 
   if (verbose)
   {  
-     gettimeofday(&end, NULL);
-     printf("Time: %fs\n", ((end.tv_sec-start.tv_sec)* 1000000u + 
-            end.tv_usec - start.tv_usec) / 1.e6);
+    gettimeofday(&end, NULL);
+    printf("Time: %fs\n", ((end.tv_sec-start.tv_sec)* 1000000u + 
+           end.tv_usec - start.tv_usec) / 1.e6);
 
-     printf(" 2.Computing the gradient: \t \t");
+    printf(" 2.Computing the gradient: \t \t");
+    gettimeofday(&start, NULL);    
+
   }
   
   //compute the gradient of the image
@@ -414,8 +424,8 @@ void harris(
 
   if (verbose) 
   {  
-     gettimeofday(&end, NULL);
-     printf("Time: %fs\n", ((end.tv_sec-start.tv_sec)* 1000000u + 
+    gettimeofday(&end, NULL);
+    printf("Time: %fs\n", ((end.tv_sec-start.tv_sec)* 1000000u + 
             end.tv_usec - start.tv_usec) / 1.e6);
 
 //      printf("  -Saving Is.png, Ix.png, Iy.png\n");
@@ -427,9 +437,9 @@ void harris(
 //      iio_save_image_float_vec(name2, Ix, nx, ny, 1);
 //      iio_save_image_float_vec(name3, Iy, nx, ny, 1);
 
-     printf(" 3.Computing the Autocorrelation: \t");
+    printf(" 3.Computing the Autocorrelation: \t");
 
-     gettimeofday(&start, NULL);
+    gettimeofday(&start, NULL);
   }
 
   //variables for the Autocorrelation matrix
@@ -442,8 +452,8 @@ void harris(
 
   if (verbose) 
   {  
-     gettimeofday(&end, NULL);
-     printf("Time: %fs\n", ((end.tv_sec-start.tv_sec)* 1000000u + 
+    gettimeofday(&end, NULL);
+    printf("Time: %fs\n", ((end.tv_sec-start.tv_sec)* 1000000u + 
             end.tv_usec - start.tv_usec) / 1.e6);
 
     printf(" 4.Computing Harris function: \t\t");
@@ -465,14 +475,14 @@ void harris(
 
   if (verbose) 
   {
-     gettimeofday(&end, NULL);
-     printf("Time: %fs\n", ((end.tv_sec-start.tv_sec)* 1000000u + 
-            end.tv_usec - start.tv_usec) / 1.e6);
+    gettimeofday(&end, NULL);
+    printf("Time: %fs\n", ((end.tv_sec-start.tv_sec)* 1000000u + 
+           end.tv_usec - start.tv_usec) / 1.e6);
      
     // printf("  -Mc max=%f, Mc min=%f\n",max, min);     
      
-     printf(" 5.Apply threshold: \t\t \t");
-     gettimeofday(&start, NULL);     
+    printf(" 5.Apply threshold: \t\t \t");
+    gettimeofday(&start, NULL);     
   }
   
   //threshold the discriminant function
@@ -489,12 +499,12 @@ void harris(
       
   if (verbose) 
   {
-     gettimeofday(&end, NULL);
-     printf("Time: %fs\n", ((end.tv_sec-start.tv_sec)* 1000000u + 
-            end.tv_usec - start.tv_usec) / 1.e6);
+    gettimeofday(&end, NULL);
+    printf("Time: %fs\n", ((end.tv_sec-start.tv_sec)* 1000000u + 
+           end.tv_usec - start.tv_usec) / 1.e6);
      
-     printf(" 6.Non-maximum suppression:  \t\t");
-     gettimeofday(&start, NULL);     
+    printf(" 6.Non-maximum suppression:  \t\t");
+    gettimeofday(&start, NULL);     
   }
 
   //apply non-maximum suppression to select salient corners
@@ -503,15 +513,15 @@ void harris(
 
   if (verbose) 
   {
-     gettimeofday(&end, NULL);
-     printf("Time: %fs\n", ((end.tv_sec-start.tv_sec)* 1000000u + 
-            end.tv_usec - start.tv_usec) / 1.e6);
+    gettimeofday(&end, NULL);
+    printf("Time: %fs\n", ((end.tv_sec-start.tv_sec)* 1000000u + 
+           end.tv_usec - start.tv_usec) / 1.e6);
   }
 
   if (verbose) 
   {
-     printf(" 7.Selecting output corners:  \t\t");
-     gettimeofday(&start, NULL);     
+    printf(" 7.Selecting output corners:  \t\t");
+    gettimeofday(&start, NULL);     
   }
 
   //select output corners depending on the strategy
@@ -520,17 +530,17 @@ void harris(
 
   if (verbose) 
   {
-     gettimeofday(&end, NULL);
-     printf("Time: %fs\n", ((end.tv_sec-start.tv_sec)* 1000000u + 
-            end.tv_usec - start.tv_usec) / 1.e6);
+    gettimeofday(&end, NULL);
+    printf("Time: %fs\n", ((end.tv_sec-start.tv_sec)* 1000000u + 
+           end.tv_usec - start.tv_usec) / 1.e6);
   }
 
   if(precision==QUADRATIC_APPROXIMATION || precision==QUARTIC_INTERPOLATION)
   {
     if (verbose)
     {
-       printf(" 8.Computing subpixel accuracy: \t");
-       gettimeofday(&start, NULL);
+      printf(" 8.Computing subpixel accuracy: \t");
+      gettimeofday(&start, NULL);
     }
 
     //calculate subpixel precision
@@ -538,9 +548,9 @@ void harris(
 
     if (verbose)
     {      
-       gettimeofday(&end, NULL);
-       printf("Time: %fs\n", ((end.tv_sec-start.tv_sec)* 1000000u + 
-            end.tv_usec - start.tv_usec) / 1.e6);
+      gettimeofday(&end, NULL);
+      printf("Time: %fs\n", ((end.tv_sec-start.tv_sec)* 1000000u + 
+           end.tv_usec - start.tv_usec) / 1.e6);
     }
   }
 

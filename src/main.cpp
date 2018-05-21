@@ -214,6 +214,7 @@ void draw_points(
   if(strategy==DISTRIBUTED_N_CORNERS)
   {
     //draw cells limits
+    #pragma omp parallel for
     for(int i=0; i<cells; i++)
     {
       int cellx=cells, celly=cells;
@@ -257,6 +258,7 @@ void draw_points(
   }
 
   //draw a cross for each corner
+  #pragma omp parallel for
   for(unsigned int i=0;i<corners.size();i++)
   {
     int x=corners[i].x;
@@ -321,7 +323,7 @@ void rgb2gray(
  *
  */
 int main(int argc, char *argv[]) 
-{
+{      
   //parameters of the method
   char  *image, *out_image=NULL, *out_file=NULL;
   float k, sigma_d, sigma_i, threshold;

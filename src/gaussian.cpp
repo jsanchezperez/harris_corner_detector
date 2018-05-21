@@ -209,38 +209,6 @@ void sii_gaussian_conv(sii_coeffs &c, float *dest, float *buffer,
 
     n=0;
 
-#ifdef __AVX_DEPRECATED__   //parece que con -O3 no aporta mucho
-    /* Compute stacked box filters (parallel). */
-    for (; n < N-8; n+=8, dest+=8*stride)
-    {
-        __m256 accum = _mm256_setzero_ps();
-
-        for (k = 0; k < c.K; ++k)
-        {
-          __m256 b1 = _mm256_loadu_ps(&buffer[n + c.radii[k]]);
-          __m256 b2 = _mm256_loadu_ps(&buffer[n - c.radii[k] - 1]);
-
-          __m256 b3 = _mm256_sub_ps(b1, b2);
-
-          __m256 wght = _mm256_set1_ps(c.weights[k]);
-
-         // accum = _mm256_fmadd_ps(wght, b3, accum); //doesn't compile
-          accum = _mm256_add_ps(accum, _mm256_mul_ps(wght, b3));
-        }
-        
-        float *vec = (float*)&accum;
-        *dest            = vec[0];
-        *(dest+1*stride) = vec[1];
-        *(dest+2*stride) = vec[2];
-        *(dest+3*stride) = vec[3];
-        *(dest+4*stride) = vec[4];
-        *(dest+5*stride) = vec[5];
-        *(dest+6*stride) = vec[6];
-        *(dest+7*stride) = vec[7];
-    }
-
-#endif
-
     /* Compute stacked box filters (sequentially)*/
     for (;n < N; ++n, dest += stride)
     {
@@ -360,10 +328,11 @@ void std_gaussian(
   for (int i=0; i<size; i++)
     B[i] /= norm;
 
+#pragma omp parallel for
   //convolution of each line of the input image
-  double *R = new double[size+xdim+size];
   for (k=0; k<ydim; k++)
   {
+    double *R = new double[size+xdim+size];
     for (i=size; i<bdx; i++)
       R[i] = I[k*xdim+i-size];
 
@@ -383,12 +352,14 @@ void std_gaussian(
 
       I[k*xdim+i-size] = sum;
     }
+    delete []R;
   }
 
+#pragma omp parallel for
   // convolution of each column of the input image
-  double *T = new double[size+ydim+size];
   for (k=0; k<xdim; k++)
   {
+    double *T = new double[size+ydim+size];
     for (i=size; i<bdy; i++)
       T[i] = I[(i-size)*xdim+k];
            
@@ -408,13 +379,11 @@ void std_gaussian(
 
       I[(i-size)*xdim+k] = sum;
     }
+    delete[]T;
   }
 
   delete[]B;
-  delete[]R;
-  delete[]T;
 }
-
 
 
 /**
