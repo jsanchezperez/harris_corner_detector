@@ -150,6 +150,9 @@ void non_maximum_suppression(
   int   ny              // number of rows of the image
 )
 {
+  //test if the image is too small for the chosen radius
+  if(ny<=2*radius || nx<=2*radius) return;
+  
   int *skip  = new int[nx*ny]();
   int size   = (2*radius+1)*(2*radius+1)-2*radius-1;
   
