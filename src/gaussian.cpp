@@ -404,7 +404,7 @@ void gaussian(
 {
   if(type==STD_GAUSSIAN)
     //using separable filters
-    discrete_gaussian (I, nx, ny, sigma, K);
+    discrete_gaussian(I, nx, ny, sigma, K);
   else
   {
     if(type==FAST_GAUSSIAN)

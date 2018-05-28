@@ -334,7 +334,6 @@ int main(int argc, char *argv[])
   int   gaussian, gradient, strategy, Nselect, measure;
   int   precision, cells, verbose;
 
-  printf("Read parameters\n");
   //read the parameters from the console
   int result=read_parameters(
         argc, argv, &image, &out_image, &out_file, 
@@ -346,13 +345,11 @@ int main(int argc, char *argv[])
   {
     int nx, ny, nz;
 
-    printf("Read image\n");
-  
     float *Ic=iio_read_image_float_vec(image, &nx, &ny, &nz);
 
     if(verbose)
       printf(
-        "Parameters:\n"
+        "\nParameters:\n"
         "  input image: '%s', output image: '%s', output corner file: %s\n"
         "  gaussian: %d, gradient: %d, measure: %d, K: %f, sigma_d: %f  \n"
         "  sigma_i: %f, threshold: %f, strategy: %d, Number of cells: %d\n"
@@ -367,8 +364,6 @@ int main(int argc, char *argv[])
       std::vector<harris_corner> corners;
       float *I=new float[nx*ny];
       
-      printf("Convert image to greyscale levels\n");
-
       if(nz>1)
         rgb2gray(Ic, I, nx, ny, nz);
       else
@@ -379,9 +374,6 @@ int main(int argc, char *argv[])
 
       if (verbose)
         gettimeofday(&start, NULL);
-
-
-      printf("Execute Harris method\n");
 
       //compute Harris' corners
       harris(
@@ -400,29 +392,18 @@ int main(int argc, char *argv[])
 
       if(out_image!=NULL)
       {
-        printf("Draw points\n");
-
         draw_points(Ic, corners, strategy, cells, nx, ny, nz, 2*sigma_i);
-        
-        printf("Save image\n");
-
         iio_save_image_float_vec(out_image, Ic, nx, ny, nz);
       }
 
       if(out_file!=NULL)
       {
         FILE *fd=fopen(out_file,"w");
-        
-        printf("Write points to file\n");
-
-       
         fprintf(fd, "Number of points: %ld\n", corners.size());
         for(unsigned int i=0;i<corners.size();i++)
           fprintf(fd, "%f %f %f\n", corners[i].x, corners[i].y, corners[i].Mc);
         fclose(fd);
       }
-
-      printf("Free memory\n");
 
       delete []I;
       free (Ic);

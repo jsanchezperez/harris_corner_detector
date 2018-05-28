@@ -29,7 +29,7 @@ bool quadratic_approximation(
   float fxy = 0.25*(M[0]-M[2]-M[6]+M[8]);
   
   float det = fxx*fyy-fxy*fxy;
-   
+  
   //check invertibility
   if(det*det<1E-6)
     return false;
