@@ -85,6 +85,8 @@ void compute_discriminant_function(
 )
 {
   int size = nx*ny;
+  max = FLT_MIN;
+  min = FLT_MAX;
 
   //compute the discriminant function following one strategy
   switch(measure) 
@@ -463,8 +465,8 @@ void harris(
     gettimeofday(&start, NULL);     
   }
 
-  float max = FLT_MIN;
-  float min = FLT_MAX;
+  float max;
+  float min;
   float *Mc = new float[size];
 
   //calculate the discriminant function (Harris, Shi-Tomasi, Harmonic mean)

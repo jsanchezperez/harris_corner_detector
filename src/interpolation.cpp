@@ -28,9 +28,9 @@ bool quadratic_approximation(
   float fyy = (M[7]-2*M[4]+M[1]);
   float fxy = 0.25*(M[0]-M[2]-M[6]+M[8]);
   
-  //check invertibility
   float det = fxx*fyy-fxy*fxy;
    
+  //check invertibility
   if(det*det<1E-6)
     return false;
   else
@@ -39,7 +39,7 @@ bool quadratic_approximation(
     float dx = (fyy*fx-fxy*fy)/det;
     float dy = (fxx*fy-fxy*fx)/det;
     x-=dx; y-=dy;
-    Mo=M[4]+fx*dx+fy*dy+0.5*(fxx*dx*dx+2*dx*dy*fxy+fyy*dy*dy+2*dx*dy*fxy);
+    Mo=M[4]+fx*dx+fy*dy+0.5*(fxx*dx*dx+2*dx*dy*fxy+fyy*dy*dy);
     return true;
   }
 }

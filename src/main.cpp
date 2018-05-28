@@ -264,6 +264,9 @@ void draw_points(
   {
     int x=corners[i].x;
     int y=corners[i].y;
+    
+    if(x>=nx || y>=ny ||x<0||y<0) 
+       printf("ERRRRRORRRRR pixel fuera %d %d \n",x,y);
 
     int x0=(x-radius<0)?0: x-radius;
     int x1=(x+radius>=nx)?nx-1: x+radius;
@@ -341,8 +344,8 @@ int main(int argc, char *argv[])
 
   if(result)
   {
-    int nx, ny, nz; 
-    
+    int nx, ny, nz;
+
     printf("Read image\n");
   
     float *Ic=iio_read_image_float_vec(image, &nx, &ny, &nz);
