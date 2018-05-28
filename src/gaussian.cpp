@@ -293,16 +293,18 @@ void sii_gaussian_conv_image(sii_coeffs &c, float *dest,
  * Convolution with a Gaussian using separable filters
  *
  */
-void std_gaussian(
+void discrete_gaussian(
   float *I,       //input/output image
   int   xdim,     //image width
   int   ydim,     //image height
-  float sigma,    //Gaussian sigma
+  float sigma,    //Gaussian standard deviation
   int   precision //defines the size of the window
 )
 {
   int i, j, k;
 
+  if(sigma<=0 || precision<0) return;
+  
   double den  = 2*sigma*sigma;
   int    size = (int) (precision*sigma)+1;
   int    bdx  = xdim+size;
@@ -402,7 +404,7 @@ void gaussian(
 {
   if(type==STD_GAUSSIAN)
     //using separable filters
-    std_gaussian (I, nx, ny, sigma, K);
+    discrete_gaussian (I, nx, ny, sigma, K);
   else
   {
     if(type==FAST_GAUSSIAN)

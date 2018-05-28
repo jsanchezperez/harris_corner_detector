@@ -4,6 +4,7 @@
 #include <sys/time.h> 
 #include <math.h>
 #include <float.h>
+#include <omp.h>
 
 #include "harris.h"
 #include "gaussian.h"
@@ -18,7 +19,7 @@ extern "C"
 #define PAR_DEFAULT_K 0.06
 #define PAR_DEFAULT_SIGMA_D 1.0
 #define PAR_DEFAULT_SIGMA_I 2.5
-#define PAR_DEFAULT_THRESHOLD 10
+#define PAR_DEFAULT_THRESHOLD 130
 #define PAR_DEFAULT_GAUSSIAN FAST_GAUSSIAN
 #define PAR_DEFAULT_GRADIENT CENTRAL_DIFFERENCES
 #define PAR_DEFAULT_MEASURE HARRIS_MEASURE
@@ -258,7 +259,7 @@ void draw_points(
   }
 
   //draw a cross for each corner
-  #pragma omp parallel for
+  //#pragma omp parallel for
   for(unsigned int i=0;i<corners.size();i++)
   {
     int x=corners[i].x;
@@ -330,6 +331,7 @@ int main(int argc, char *argv[])
   int   gaussian, gradient, strategy, Nselect, measure;
   int   precision, cells, verbose;
 
+  printf("Read parameters\n");
   //read the parameters from the console
   int result=read_parameters(
         argc, argv, &image, &out_image, &out_file, 
@@ -339,7 +341,10 @@ int main(int argc, char *argv[])
 
   if(result)
   {
-    int nx, ny, nz;   
+    int nx, ny, nz; 
+    
+    printf("Read image\n");
+  
     float *Ic=iio_read_image_float_vec(image, &nx, &ny, &nz);
 
     if(verbose)
@@ -358,6 +363,8 @@ int main(int argc, char *argv[])
     {
       std::vector<harris_corner> corners;
       float *I=new float[nx*ny];
+      
+      printf("Convert image to greyscale levels\n");
 
       if(nz>1)
         rgb2gray(Ic, I, nx, ny, nz);
@@ -369,6 +376,9 @@ int main(int argc, char *argv[])
 
       if (verbose)
         gettimeofday(&start, NULL);
+
+
+      printf("Execute Harris method\n");
 
       //compute Harris' corners
       harris(
@@ -387,19 +397,29 @@ int main(int argc, char *argv[])
 
       if(out_image!=NULL)
       {
+        printf("Draw points\n");
+
         draw_points(Ic, corners, strategy, cells, nx, ny, nz, 2*sigma_i);
+        
+        printf("Save image\n");
+
         iio_save_image_float_vec(out_image, Ic, nx, ny, nz);
       }
 
       if(out_file!=NULL)
       {
         FILE *fd=fopen(out_file,"w");
+        
+        printf("Write points to file\n");
+
        
         fprintf(fd, "Number of points: %ld\n", corners.size());
         for(unsigned int i=0;i<corners.size();i++)
           fprintf(fd, "%f %f %f\n", corners[i].x, corners[i].y, corners[i].Mc);
         fclose(fd);
       }
+
+      printf("Free memory\n");
 
       delete []I;
       free (Ic);
