@@ -265,9 +265,6 @@ void draw_points(
     int x=corners[i].x;
     int y=corners[i].y;
     
-    if(x>=nx || y>=ny ||x<0||y<0) 
-       printf("ERRRRRORRRRR pixel fuera %d %d \n",x,y);
-
     int x0=(x-radius<0)?0: x-radius;
     int x1=(x+radius>=nx)?nx-1: x+radius;
     int y0=(y-radius<0)?0: y-radius;
@@ -275,30 +272,45 @@ void draw_points(
 
     if(nz>=3)
     {
+      //draw horizontal line
       for(int j=x0;j<=x1;j++)
       {
         I[(y*nx+j)*nz]=0;
         I[(y*nx+j)*nz+1]=0;
         I[(y*nx+j)*nz+2]=255;
       }
-    }
-    else
-      for(int j=x0;j<=x1;j++)
-          I[y*nx+j]=255;
-    
-    if(nz>=3)
-    {
+            
+      //draw vertical line
       for(int j=y0;j<=y1;j++)
       {
         I[(j*nx+x)*nz]=0;
         I[(j*nx+x)*nz+1]=0;
         I[(j*nx+x)*nz+2]=255;
       }
+
+      //draw square in the center
+      I[((y-1)*nx+x-1)*nz]=I[((y-1)*nx+x-1)*nz+1]=0;
+      I[((y-1)*nx+x+1)*nz]=I[((y-1)*nx+x+1)*nz+1]=0;
+      I[((y-1)*nx+x-1)*nz+2]=I[((y-1)*nx+x+1)*nz+2]=255;
+      I[((y+1)*nx+x-1)*nz]=I[((y+1)*nx+x-1)*nz+1]=0;
+      I[((y+1)*nx+x+1)*nz]=I[((y+1)*nx+x+1)*nz+1]=0;
+      I[((y+1)*nx+x-1)*nz+2]=I[((y+1)*nx+x+1)*nz+2]=255;
     }
     else
-        for(int j=y0;j<=y1;j++)
+    {
+      //draw horizontal line
+      for(int j=x0;j<=x1;j++)
+          I[y*nx+j]=255;
+                  
+      //draw vertical line
+      for(int j=y0;j<=y1;j++)
           I[j*nx+x]=255;
+
+      //draw square in the center
+      I[(y-1)*nx+x-1]=255; I[(y-1)*nx+x+1]=255;
+      I[((y+1)*nx+x-1)*nz]=255; I[((y+1)*nx+x+1)*nz]=255;
     }
+  }
 }
 
 

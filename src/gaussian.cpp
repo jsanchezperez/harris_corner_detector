@@ -365,7 +365,7 @@ void discrete_gaussian(
     for (i=size; i<bdy; i++)
       T[i] = I[(i-size)*xdim+k];
            
-    // Reflecting boundary conditions
+    //reflecting boundary conditions
     for (i=0, j=bdy; i<size; i++, j++)
     {
       T[i] = I[(size-i)*xdim+k];
