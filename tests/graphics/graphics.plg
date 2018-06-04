@@ -1,6 +1,33 @@
 Yt=1.1
 
 
+#GAUSSIAN GRAPHICS
+set terminal postscript enhanced dashed
+set output "gaussian_comparison.eps"
+set key bottom
+set xrange [0:180]
+set yrange [0:Yt]
+set ytics 0,0.1,Yt
+set ylabel "repeatability rate"
+set xlabel "{rotation angle in degrees}"
+plot "../no_gaussian.txt" using ($1*180/pi):3 title "No Gaussian conv" with lines, "../std_gaussian.txt" using ($1*180/pi):3 title "Discrete Gaussian conv" with lines, "../fast_gaussian.txt" using ($1*180/pi):3 title "Fast Gaussian conv" with lines
+
+set terminal postscript enhanced dashed
+set output "gaussian_xi_std.eps" 
+set xrange [0:180]
+set ytics 0,0.1,Yt
+set xlabel "{rotation angle in degrees}"
+plot "../std_gaussian.txt" using ($1*180/pi):2 title "{/Symbol e}=0.5" with lines, "../std_gaussian.txt" using ($1*180/pi):4 title "{/Symbol e}=1.5" with lines, "../std_gaussian.txt" using ($1*180/pi):7 title "{/Symbol e}=3.0" with lines, "../std_gaussian.txt" using ($1*180/pi):11 title "{/Symbol e}=5.0" with lines
+
+
+set terminal postscript enhanced dashed
+set output "gaussian_xi_fast.eps"
+set xrange [0:180]
+set ytics 0,0.1,Yt
+set xlabel "{rotation angle in degrees}"
+plot "../fast_gaussian.txt" using ($1*180/pi):2 title "{/Symbol e}=0.5" with lines, "../fast_gaussian.txt" using ($1*180/pi):4 title "{/Symbol e}=1.5" with lines, "../fast_gaussian.txt" using ($1*180/pi):7 title "{/Symbol e}=3.0" with lines, "../fast_gaussian.txt" using ($1*180/pi):11 title "{/Symbol e}=5.0" with lines
+
+
 #SUBPIXEL GRAPHICS
 set terminal postscript enhanced dashed
 set output "subpixel_quadratic.eps"
@@ -25,42 +52,6 @@ set xlabel "{rotation angle in degrees}"
 set xrange [0:180]
 set ytics 0,0.1,Yt
 plot  "../subpixel_quadratic.txt" using ($1*180/pi):4 title "Quadratic approximation - {/Symbol e}=1.5" with lines, "../subpixel_quartic.txt" using ($1*180/pi):4 title "Quartic interpolation - {/Symbol e}=1.5" with lines, "../subpixel_quadratic.txt" using ($1*180/pi):2 title "Quadratic approximation - {/Symbol e}=0.5" with lines, "../subpixel_quartic.txt" using ($1*180/pi):2 title "Quartic interpolation - {/Symbol e}=0.5" with lines,
-
-
-#AFFINE INVARIANCE
-set terminal postscript enhanced dashed
-set output "affine.eps"
-set yrange [0:Yt]
-set xrange [0:1]
-set ytics 0,0.1,Yt
-set xlabel "shear"
-set ylabel "repeatability rate"
-plot "../affine.txt" using 1:2 title "{/Symbol e}=0.5" with lines, "../affine.txt" using 1:4 title "{/Symbol e}=1.5" with lines, "../affine.txt" using 1:7 title "{/Symbol e}=3.0" with lines, "../affine.txt" using 1:11 title "{/Symbol e}=5.0" with lines
-
-
-#GAUSSIAN GRAPHICS
-set terminal postscript enhanced dashed
-set output "gaussian_comparison.eps"
-set key bottom
-set xrange [0:180]
-set ytics 0,0.1,Yt
-set xlabel "{rotation angle in degrees}"
-plot "../no_gaussian.txt" using ($1*180/pi):7 title "No Gaussian conv" with lines, "../std_gaussian.txt" using ($1*180/pi):7 title "Standard Gaussian conv" with lines, "../fast_gaussian.txt" using ($1*180/pi):7 title "Fast Gaussian conv" with lines
-
-set terminal postscript enhanced dashed
-set output "gaussian_xi_std.eps" 
-set xrange [0:180]
-set ytics 0,0.1,Yt
-set xlabel "{rotation angle in degrees}"
-plot "../std_gaussian.txt" using ($1*180/pi):2 title "{/Symbol e}=0.5" with lines, "../std_gaussian.txt" using ($1*180/pi):4 title "{/Symbol e}=1.5" with lines, "../std_gaussian.txt" using ($1*180/pi):7 title "{/Symbol e}=3.0" with lines, "../std_gaussian.txt" using ($1*180/pi):11 title "{/Symbol e}=5.0" with lines
-
-
-set terminal postscript enhanced dashed
-set output "gaussian_xi_fast.eps"
-set xrange [0:180]
-set ytics 0,0.1,Yt
-set xlabel "{rotation angle in degrees}"
-plot "../fast_gaussian.txt" using ($1*180/pi):2 title "{/Symbol e}=0.5" with lines, "../fast_gaussian.txt" using ($1*180/pi):4 title "{/Symbol e}=1.5" with lines, "../fast_gaussian.txt" using ($1*180/pi):7 title "{/Symbol e}=3.0" with lines, "../fast_gaussian.txt" using ($1*180/pi):11 title "{/Symbol e}=5.0" with lines
 
 
 #GRADIENT GRAPHICS
@@ -108,6 +99,16 @@ set key autotitle columnhead
 set xrange [0:4]
 set xlabel "{scale factor}"
 plot "../scale.txt" using 1:2 title "{/Symbol e}=0.5" with lines, "../scale.txt" using 1:4 title "{/Symbol e}=1.5" with lines, "../scale.txt" using 1:7 title "{/Symbol e}=3.0" with lines, "../scale.txt" using 1:11 title "{/Symbol e}=5.0" with lines
+
+#AFFINE INVARIANCE
+set terminal postscript enhanced dashed
+set output "affine.eps"
+set yrange [0:Yt]
+set xrange [0:1]
+set ytics 0,0.1,Yt
+set xlabel "shear"
+set ylabel "repeatability rate"
+plot "../affine.txt" using 1:2 title "{/Symbol e}=0.5" with lines, "../affine.txt" using 1:4 title "{/Symbol e}=1.5" with lines, "../affine.txt" using 1:7 title "{/Symbol e}=3.0" with lines, "../affine.txt" using 1:11 title "{/Symbol e}=5.0" with lines
 
 
 

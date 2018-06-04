@@ -88,7 +88,7 @@ float repetability_rate(
    inverse_transform(p, p_1, nparams);
 
    //select points in common scene parts for first set
-   for(int i=0; i<points1.size(); i++)
+   for(unsigned int i=0; i<points1.size(); i++)
    {
      float xp, yp;
      project(points1[i].x, points1[i].y, p_1, xp, yp, nparams);
@@ -102,7 +102,7 @@ float repetability_rate(
    }
 
    //select points in common scene parts for second set
-   for(int i=0; i<points2.size(); i++)
+   for(unsigned int i=0; i<points2.size(); i++)
    {
      float xp, yp;
      project(points2[i].x, points2[i].y, p, xp, yp, nparams);
@@ -115,9 +115,9 @@ float repetability_rate(
    int N=0;
    if(s1.size()<s2.size())
    {
-      for(int i=0; i<s1.size(); i++)
+      for(unsigned int i=0; i<s1.size(); i++)
       {
-        int j=0;
+        unsigned int j=0;
         
         //search the point in the other set
         while(j<s2.size() && distance(s1[i], s2[j])>=TOL*TOL) 
@@ -129,9 +129,9 @@ float repetability_rate(
    }
    else
    {
-      for(int i=0; i<s2.size(); i++)
+      for(unsigned int i=0; i<s2.size(); i++)
       {
-        int j=0;
+        unsigned int j=0;
         
         //search the point in the other set
         while(j<s1.size() && distance(s1[j], s2[i])>=TOL*TOL) 
@@ -312,8 +312,8 @@ void create_graphic(
  float k=0.06;
  float sigma_d=SIGMA_D;
  float sigma_i=SIGMA_I;
- float threshold=0;//30;
- int   strategy=N_CORNERS; //DISTRIBUTED_N_CORNERS //ALL_CORNERS;
+ float threshold=130;//30;
+ int   strategy=ALL_CORNERS; //N_CORNERS; //DISTRIBUTED_N_CORNERS //ALL_CORNERS;
  int   cells=1;
  int   Nselect=1500;
  int   subpixel_precision=1;
@@ -509,146 +509,129 @@ void create_graphic(
 
 /**
  *
- *  Main function.
+ *  Main function
  *  This program executes all the tests for a single image
  *
  */
 int main(int argc, char *argv[])
 {
-   int N = 101;
-   int NTOL = 10;
-   double TOL[10] = {0.5,1.0,1.5,2.0,2.5,3.0,3.5,4.0,4.5,5.0};
-   double inc;
-   double alpha[N];
-   int opencv = 0; 
+   if(argc >= 2)
+   {
+      int N = 101;
+      int NTOL = 10;
+      double TOL[10] = {0.5,1.0,1.5,2.0,2.5,3.0,3.5,4.0,4.5,5.0};
+      double inc;
+      double alpha[N];
+      int opencv = 0; 
 
-   //rotation-graphic for a range of xi-repeatability
-   printf("Generating rotation graphics:\n");
-   inc=PI/(N-1.0);
-   alpha[0]=0;
-   for(int i=1; i<N; i++)
-     alpha[i]=alpha[i-1]+inc;
-    
-   create_graphic(
-     argv[1], alpha, N, TOL, NTOL, ROTATION, "rotation.txt", opencv
-   );
-
-   return 0;
-
-
-   //noise-graphic for a range of xi-repeatability
-   printf("Generating noise graphics:\n");
-   double noise[N];
-   inc=30./N;
-   noise[0]=0;
-   for(int i=1; i<N; i++)
-     noise[i]=noise[i-1]+inc;
-    
-   create_graphic(argv[1], noise, N, TOL, NTOL, NOISE, "noise.txt", opencv);
-
-//return 0;   
-
-   //illumination-graphic for a range of xi-repeatability
-   printf("Generating illumination graphics:\n");
-   double illumination[N];
-   inc=(6-0.1)/(N-2.0);
-   illumination[0]=1; illumination[1]=0.1;
-   for(int i=2; i<N; i++)
-      illumination[i]=illumination[i-1]+inc;
-    
-   create_graphic(
-     argv[1], illumination, N, TOL, NTOL, ILLUMINATION, "light.txt", opencv
-   );
-
-//return 0;
-
-   //affine-graphic for a range of xi-repeatability
-   printf("Generating affine graphics:\n");
-   double affine[N];
-   inc=1/(N-2.0);
-   affine[0]=0; 
-   for(int i=1; i<N; i++)
-      affine[i]=affine[i-1]+inc;
+      //comparing harris, harris improved and fast harris improved 
+      printf("Generating Gaussian graphics:\n");
+      inc=PI/(N-1.0);
+      alpha[0]=0;
+      for(int i=1; i<N; i++)
+        alpha[i]=alpha[i-1]+inc;
+       
+      create_graphic(
+        argv[1], alpha, N, TOL, NTOL, GAUSSIAN, 
+        "std_gaussian.txt", opencv, STD_GAUSSIAN
+      );
+      create_graphic(
+        argv[1], alpha, N, TOL, NTOL, GAUSSIAN, 
+        "fast_gaussian.txt", opencv, FAST_GAUSSIAN
+      );
+      create_graphic(
+        argv[1], alpha, N, TOL, NTOL, GAUSSIAN, 
+        "no_gaussian.txt", opencv, NO_GAUSSIAN
+      );
       
-   create_graphic(argv[1], affine, N, TOL, NTOL, AFFINE, "affine.txt", opencv);
+      //rotation-graphic for a range of xi-repeatability
+      printf("Generating rotation graphics:\n");
+      inc=PI/(N-1.0);
+      alpha[0]=0;
+      for(int i=1; i<N; i++)
+        alpha[i]=alpha[i-1]+inc;
+       
+      create_graphic(
+        argv[1], alpha, N, TOL, NTOL, ROTATION, "rotation.txt", opencv
+      );
 
-//return 0;   
+      //noise-graphic for a range of xi-repeatability
+      printf("Generating noise graphics:\n");
+      double noise[N];
+      inc=30./N;
+      noise[0]=0;
+      for(int i=1; i<N; i++)
+        noise[i]=noise[i-1]+inc;
+       
+      create_graphic(argv[1], noise, N, TOL, NTOL, NOISE, "noise.txt", opencv);
 
-   //scale-graphic for a range of xi-repeatability
-   //the first value must be removed
-   printf("Generating scale graphics:\n");
-   double scales[N];
-   inc=(4-0.2)/(N-2.0);
-   scales[0]=1; scales[1]=0.2;
-   for(int i=2; i<N; i++)
-     scales[i]=scales[i-1]+inc;
-    
-   create_graphic(argv[1], scales, N, TOL, NTOL, SCALE, "scale.txt", opencv);
+      //illumination-graphic for a range of xi-repeatability
+      printf("Generating illumination graphics:\n");
+      double illumination[N];
+      inc=(6-0.1)/(N-2.0);
+      illumination[0]=1; illumination[1]=0.1;
+      for(int i=2; i<N; i++)
+         illumination[i]=illumination[i-1]+inc;
+       
+      create_graphic(
+        argv[1], illumination, N, TOL, NTOL, ILLUMINATION, "light.txt", opencv
+      );
 
-   //return 0;     
+      //affine-graphic for a range of xi-repeatability
+      printf("Generating affine graphics:\n");
+      double affine[N];
+      inc=1/(N-2.0);
+      affine[0]=0; 
+      for(int i=1; i<N; i++)
+         affine[i]=affine[i-1]+inc;
+         
+      create_graphic(argv[1], affine, N, TOL, NTOL, AFFINE, "affine.txt", opencv);
 
-   //subpixel-graphic for a range of xi-repeatability
-   printf("Generating subpixel graphics:\n");
-   inc=PI/(N-1.0);
-   alpha[0]=0;
-   for(int i=1; i<N; i++)
-     alpha[i]=alpha[i-1]+inc;
-    
-   create_graphic(
-     argv[1], alpha, N, TOL, NTOL, SUBPIXEL, 
-     "subpixel_quadratic.txt", opencv, QUADRATIC_APPROXIMATION
-   );
-   
-   create_graphic(
-     argv[1], alpha, N, TOL, NTOL, SUBPIXEL, 
-     "subpixel_quartic.txt", opencv, QUARTIC_INTERPOLATION
-   );
+      //scale-graphic for a range of xi-repeatability
+      //the first value must be removed
+      printf("Generating scale graphics:\n");
+      double scales[N];
+      inc=(4-0.2)/(N-2.0);
+      scales[0]=1; scales[1]=0.2;
+      for(int i=2; i<N; i++)
+        scales[i]=scales[i-1]+inc;
+       
+      create_graphic(argv[1], scales, N, TOL, NTOL, SCALE, "scale.txt", opencv);
 
-   //return 0;
+     //subpixel-graphic for a range of xi-repeatability
+      printf("Generating subpixel graphics:\n");
+      inc=PI/(N-1.0);
+      alpha[0]=0;
+      for(int i=1; i<N; i++)
+        alpha[i]=alpha[i-1]+inc;
+       
+      create_graphic(
+        argv[1], alpha, N, TOL, NTOL, SUBPIXEL, 
+        "subpixel_quadratic.txt", opencv, QUADRATIC_APPROXIMATION
+      );
+      
+      create_graphic(
+        argv[1], alpha, N, TOL, NTOL, SUBPIXEL, 
+        "subpixel_quartic.txt", opencv, QUARTIC_INTERPOLATION
+      );
 
-
-   //comparing central differences and sobel operator 
-   printf("Generating gradient graphics:\n");
-   inc=PI/(N-1.0);
-   alpha[0]=0;
-   for(int i=1; i<N; i++)
-     alpha[i]=alpha[i-1]+inc;
-    
-   create_graphic(
-     argv[1], alpha, N, TOL, NTOL, GRADIENT, 
-     "central_gradient.txt", opencv, CENTRAL_DIFFERENCES
-   );
-   create_graphic(
-     argv[1], alpha, N, TOL, NTOL, GRADIENT, 
-     "sobel_gradient.txt", opencv, SOBEL_OPERATOR
-   );
-   
-   
-//return 0;
-
-   //comparing harris, harris improved and fast harris improved 
-   printf("Generating Gaussian graphics:\n");
-   inc=PI/(N-1.0);
-   alpha[0]=0;
-   for(int i=1; i<N; i++)
-     alpha[i]=alpha[i-1]+inc;
-    
-  create_graphic(
-     argv[1], alpha, N, TOL, NTOL, GAUSSIAN, 
-     "std_gaussian.txt", opencv, STD_GAUSSIAN
-   );
-   create_graphic(
-     argv[1], alpha, N, TOL, NTOL, GAUSSIAN, 
-     "fast_gaussian.txt", opencv, FAST_GAUSSIAN
-   );
-   create_graphic(
-     argv[1], alpha, N, TOL, NTOL, GAUSSIAN, 
-     "no_gaussian.txt", opencv, NO_GAUSSIAN
-   );
-   
-   
-//return 0;
-
+      //comparing central differences and sobel operator 
+      printf("Generating gradient graphics:\n");
+      inc=PI/(N-1.0);
+      alpha[0]=0;
+      for(int i=1; i<N; i++)
+        alpha[i]=alpha[i-1]+inc;
+       
+      create_graphic(
+        argv[1], alpha, N, TOL, NTOL, GRADIENT, 
+        "central_gradient.txt", opencv, CENTRAL_DIFFERENCES
+      );
+      create_graphic(
+        argv[1], alpha, N, TOL, NTOL, GRADIENT, 
+        "sobel_gradient.txt", opencv, SOBEL_OPERATOR
+      );   
+   }
+   return 0;
 }
 
 

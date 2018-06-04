@@ -1,16 +1,15 @@
 CC=gcc
 CXX=g++
-CFLAGS=-O3 -fopenmp #-Wall -Wextra -Werror
+CFLAGS=-O3 -fopenmp -Wall -Wextra
 LFLAGS=-lpng -ljpeg -ltiff -lm 
 CVFLAGS=$(shell pkg-config --cflags --libs opencv)
 
 
-all: bin obj bin/test
+all: bin bin/test
 
 bin:
 	mkdir -p bin
-
-obj:
+	mkdir -p tmp
 	mkdir -p obj
 
 obj/iio.o: ../src/iio.c ../src/iio.h
@@ -42,5 +41,5 @@ bin/test: test.cpp obj/bicubic_interpolation.o obj/harris.o obj/iio.o obj/gradie
 
 	
 clean:
-	rm -f obj/*.o bin/test
-	rmdir bin obj
+	rm -f obj/*.o bin/test tmp/*
+	rmdir bin obj tmp

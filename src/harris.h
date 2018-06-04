@@ -34,6 +34,7 @@ struct harris_corner{
 void non_maximum_suppression(
   float *D,             // input image
   std::vector<harris_corner> &corners, // Harris' corners
+  float Th,             // threshold for low values
   int   radius,         // window radius
   int   nx,             // number of columns of the image
   int   ny              // number of rows of the image

@@ -1,6 +1,6 @@
 CC=gcc
 CXX=g++
-CFLAGS=-O3 -fopenmp #-Wall -Wextra -Werror #-mavx -ffast-math 
+CFLAGS=-O3 -fopenmp -Wall -Wextra
 LFLAGS=-lpng -ljpeg -ltiff -lm 
 
 all: bin obj bin/harris_corner_detector
