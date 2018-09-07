@@ -259,6 +259,7 @@ void draw_points(
   }
 
   //draw a cross for each corner
+  #pragma omp parallel for
   for(unsigned int i=0;i<corners.size();i++)
   {
     int x=corners[i].x;
