@@ -265,10 +265,10 @@ void draw_points(
     int x=corners[i].x;
     int y=corners[i].y;
     
-    if (x<1) x = 1;
-    if (y<1) y = 1;
-    if (x>nx-2) x = nx-2;
-    if (y>ny-2) y = ny-2;
+    if(x<1) x=1;
+    if(y<1) y=1;
+    if(x>nx-2) x=nx-2;
+    if(y>ny-2) y=ny-2;
     
     
     int x0=(x-radius<0)?0: x-radius;
