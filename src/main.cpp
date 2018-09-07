@@ -264,6 +264,12 @@ void draw_points(
     int x=corners[i].x;
     int y=corners[i].y;
     
+    if (x<1) x = 1;
+    if (y<1) y = 1;
+    if (x>nx-2) x = nx-2;
+    if (y>ny-2) y = ny-2;
+    
+    
     int x0=(x-radius<0)?0: x-radius;
     int x1=(x+radius>=nx)?nx-1: x+radius;
     int y0=(y-radius<0)?0: y-radius;
@@ -304,10 +310,10 @@ void draw_points(
       //draw vertical line
       for(int j=y0;j<=y1;j++)
           I[j*nx+x]=255;
-
       //draw square in the center
       I[(y-1)*nx+x-1]=255; I[(y-1)*nx+x+1]=255;
       I[((y+1)*nx+x-1)*nz]=255; I[((y+1)*nx+x+1)*nz]=255;
+    
     }
   }
 }
