@@ -259,7 +259,6 @@ void draw_points(
   }
 
   //draw a cross for each corner
-  //#pragma omp parallel for
   for(unsigned int i=0;i<corners.size();i++)
   {
     int x=corners[i].x;
@@ -327,7 +326,6 @@ void rgb2gray(
   int   nz      //number of channels
 )
 {
-  #pragma omp parallel for
   for(int i=0;i<nx*ny;i++)
     gray[i]=(0.2989*rgb[i*nz]+0.5870*rgb[i*nz+1]+0.1140*rgb[i*nz+2]);
 }
@@ -365,7 +363,7 @@ int main(int argc, char *argv[])
         "  input image: '%s', output image: '%s', output corner file: %s\n"
         "  gaussian: %d, gradient: %d, measure: %d, K: %f, sigma_d: %f  \n"
         "  sigma_i: %f, threshold: %f, strategy: %d, Number of cells: %d\n"
-        "  Nselect: %d, precision: %d, nx: %d, ny: %d, nz: %d\n",
+        "  N: %d, precision: %d, nx: %d, ny: %d, nz: %d\n",
         image, out_image, out_file, gaussian, gradient, measure, k, 
         sigma_d, sigma_i, threshold, strategy, cells, Nselect, 
         precision, nx, ny, nz
@@ -376,16 +374,12 @@ int main(int argc, char *argv[])
       std::vector<harris_corner> corners;
       float *I=new float[nx*ny];
       
+      //convert image to grayscale
       if(nz>1)
         rgb2gray(Ic, I, nx, ny, nz);
       else
         for(int i=0;i<nx*ny;i++)
           I[i]=Ic[i];
-
-      struct timeval start, end;
-
-      if (verbose)
-        gettimeofday(&start, NULL);
 
       //compute Harris' corners
       harris(
@@ -393,14 +387,6 @@ int main(int argc, char *argv[])
         sigma_i, threshold, strategy, cells, Nselect, 
         precision, nx, ny, verbose
       );
-
-      if (verbose) 
-      {
-        gettimeofday(&end, NULL);
-        float delay=((end.tv_sec-start.tv_sec)* 1000000u + 
-                     end.tv_usec - start.tv_usec) / 1.e6; 
-        printf("\n Time: %fs\n", delay);
-      }
 
       if(out_image!=NULL)
       {
@@ -413,12 +399,12 @@ int main(int argc, char *argv[])
         FILE *fd=fopen(out_file,"w");
         fprintf(fd, "Number of points: %ld\n", corners.size());
         for(unsigned int i=0;i<corners.size();i++)
-          fprintf(fd, "%f %f %f\n", corners[i].x, corners[i].y, corners[i].Mc);
+          fprintf(fd, "%f %f %f\n", corners[i].x, corners[i].y, corners[i].R);
         fclose(fd);
       }
 
       delete []I;
-      free (Ic);
+      free(Ic);
     }
     else 
     {

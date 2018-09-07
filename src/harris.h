@@ -22,7 +22,7 @@
 **/
 struct harris_corner{
   float x,y; //position of the corner
-  float Mc;  //Harris measure for this corner
+  float R;   //corner strength
 };
 
 
@@ -32,7 +32,7 @@ struct harris_corner{
   *
 **/
 void non_maximum_suppression(
-  float *D,             // input image
+  float *R,             // input image
   std::vector<harris_corner> &corners, // Harris' corners
   float Th,             // threshold for low values
   int   radius,         // window radius
@@ -49,10 +49,10 @@ void non_maximum_suppression(
 void select_output_corners(
   std::vector<harris_corner> &corners, // output selected corners
   int strategy, // strategy for the output corners
-  int cells,           // number of regions in the image for distributed output
-  int Nselect,         // number of output corners
-  int nx,              // number of columns of the image
-  int ny               // number of rows of the image
+  int cells,    // number of regions in the image for distributed output
+  int N,        // number of output corners
+  int nx,       // number of columns of the image
+  int ny        // number of rows of the image
 );
 
 
@@ -62,7 +62,7 @@ void select_output_corners(
   *
 **/
 void compute_subpixel_precision(
-  float *Mc, // discriminant function
+  float *R,  // corner strength function
   std::vector<harris_corner> &corners, // selected corners
   int nx,    // number of columns of the image
   int type   // type of interpolation (quadratic or quartic)
@@ -86,7 +86,7 @@ void harris(
   float Th,        // threshold for eliminating low values
   int   strategy,  // strategy for the output corners
   int   cells,     // number of regions in the image for distributed output
-  int   Nselect,   // number of output corners
+  int   N,         // number of output corners
   int   precision, // enable subpixel precision
   int   nx,        // number of columns of the image
   int   ny,        // number of rows of the image

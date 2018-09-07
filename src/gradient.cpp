@@ -26,7 +26,6 @@ void central_differences(
     }
 
     //copy first and last rows
-    #pragma omp parallel for
     for(int i=1; i<nx-1; i++)
     {
       dx[i] = dx[i+nx];
@@ -34,7 +33,6 @@ void central_differences(
     }
 
     //copy first and last columns
-    #pragma omp parallel for
     for(int i=0; i<ny; i++)
     {
       dy[i*nx]=dy[i*nx+1];
@@ -72,7 +70,6 @@ void sobel_operator(
     }
 
     //copy first and last rows
-    #pragma omp parallel for
     for(int i=1; i<nx-1; i++)
     {
       dx[i] = dx[i+nx];
@@ -80,7 +77,6 @@ void sobel_operator(
     }
 
     //copy first and last columns
-    #pragma omp parallel for
     for(int i=0; i<ny; i++)
     {
       dy[i*nx]=dy[i*nx+1];
