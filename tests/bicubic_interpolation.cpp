@@ -3,7 +3,8 @@
 // copy of this license along this program. If not, see
 // <http://www.opensource.org/licenses/bsd-license.html>.
 //
-// Copyright (C) 2017, Javier Sánchez Pérez <jsanchez@ulpgc.es>
+// Copyright (C) 2018, Javier Sánchez Pérez <jsanchez@ulpgc.es>
+// Copyright (C) 2014, Nelson Monzón López <nmonzon@ctim.es>
 // All rights reserved.
 
 
