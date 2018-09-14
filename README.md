@@ -34,7 +34,7 @@ Universidad de Las Palmas de Gran Canaria
 VERSION
 *******
 
-Version 1, released on June 4, 2018
+Version 1, released on September 15, 2018
 
 
 *******
@@ -55,7 +55,7 @@ COMPILATION
 ***********
 
 Required environment: Any unix-like system with a standard compilation
-environment (make and C and C++ compilers)
+environment (make and C/C++ compilers)
 
 Required libraries: libpng, lipjpeg, libtiff
 
@@ -74,8 +74,7 @@ accompanying IPOL article. Usage instructions:
 
   Harris corner detector:
   'image' is an input image to detect features on.
-  ------------------------------------------------
-  
+  -----------------------------------------------
   OPTIONS:
   --------
    -o name  output image with detected corners 
@@ -95,6 +94,7 @@ accompanying IPOL article. Usage instructions:
               default value 1.000000
    -i N     Gaussian standard deviation for integration
               default value 2.500000
+   -z       switch on scale test for filtering corners
    -t N     threshold for eliminating low values
               default value 130
    -q N     strategy for selecting the output corners:
@@ -115,11 +115,11 @@ Execution examples:
 
   1.Default parameters and write corners to an output file:
     
-   >bin/harris_corner_detector data/building1.png -f corners.txt 
+   >bin/harris_corner_detector data/building.png -f corners.txt 
   
   2.Using Shi-Tomasi measure, threshold=10 and select best 1000 output corners:
     
-   >bin/harris_corner_detector data/building1.png -m 1 -t 10 -q 2 -n 1000 \
+   >bin/harris_corner_detector data/building.png -m 1 -t 10 -q 2 -n 1000 \
     -f corners.txt -o corners.png -v
    
    
@@ -138,7 +138,7 @@ harris.cpp:   This is the main program that implements the Harris method
 iio.c:        Functions for reading and writing images 
 interpolation.cpp: Functions for computing corners with sub-pixel accuracy
 main.cpp:     Main algorithm to read parameters and write results
-
+zoom.cpp:     Function for zooming out images by a factor of 2
 
 Directory tests:
 ----------------

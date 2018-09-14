@@ -1,17 +1,21 @@
+// This program is free software: you can use, modify and/or redistribute it
+// under the terms of the simplified BSD License. You should have received a
+// copy of this license along this program. If not, see
+// <http://www.opensource.org/licenses/bsd-license.html>.
+//
+// Copyright (C) 2018, Javier Sánchez Pérez <jsanchez@ulpgc.es>
+// All rights reserved.
+
+
 #include <stdio.h>
 #include <math.h>
-#include <float.h>
 #include <sys/time.h> 
 #include <algorithm>
-
-extern "C"
-{
-#include "iio.h"
-}
 
 #include "harris.h"
 #include "gradient.h"
 #include "gaussian.h"
+#include "zoom.h"
 #include "interpolation.h"
 
 using namespace std;
@@ -26,6 +30,7 @@ bool operator<(
   const harris_corner &c2
 ) 
 {
+  //inverse order
   return c1.R > c2.R;
 }
 
@@ -58,9 +63,9 @@ void compute_autocorrelation_matrix(
   if(gauss==NO_GAUSSIAN)
     gauss=FAST_GAUSSIAN;
 
-  gaussian(A, nx, ny, sigma, gauss);
-  gaussian(B, nx, ny, sigma, gauss);
-  gaussian(C, nx, ny, sigma, gauss);
+  gaussian(A, A, nx, ny, sigma, gauss);
+  gaussian(B, B, nx, ny, sigma, gauss);
+  gaussian(C, C, nx, ny, sigma, gauss);
 } 
 
 
@@ -81,7 +86,7 @@ void compute_corner_response(
 )
 {
   int size = nx*ny;
-
+  
   //compute the corner strength function following one strategy
   switch(measure) 
   {
@@ -124,12 +129,12 @@ void compute_corner_response(
   *
 **/
 void non_maximum_suppression(
-  float *R,             // input data
-  vector<harris_corner> &corners, // Harris' corners
-  float Th,             // threshold for low values
-  int   radius,         // window radius
-  int   nx,             // number of columns of the image
-  int   ny              // number of rows of the image
+  float *R,             //input data
+  vector<harris_corner> &corners, //Harris' corners
+  float Th,             //threshold for low values
+  int   radius,         //window radius
+  int   nx,             //number of columns of the image
+  int   ny              //number of rows of the image
 )
 {
   //check if the image is too small for the chosen radius
@@ -241,12 +246,12 @@ void non_maximum_suppression(
   *
 **/    
 void select_output_corners(
-  std::vector<harris_corner> &corners, // output selected corners
-  int strategy, // strategy for the output corners
-  int cells,    // number of regions in the image for distributed output
-  int N,        // number of output corners
-  int nx,       // number of columns of the image
-  int ny        // number of rows of the image
+  std::vector<harris_corner> &corners, //output selected corners
+  int strategy, //strategy for the output corners
+  int cells,    //number of regions in the image for distributed output
+  int N,        //number of output corners
+  int nx,       //number of columns of the image
+  int ny        //number of rows of the image
 )
 {
   switch(strategy) 
@@ -318,10 +323,10 @@ void select_output_corners(
   *
 **/
 void compute_subpixel_precision(
-  float *R, // discriminant function
-  vector<harris_corner> &corners, // selected corners
-  int nx,   // number of columns of the image
-  int type  // type of interpolation (quadratic or quartic)
+  float *R, //discriminant function
+  vector<harris_corner> &corners, //selected corners
+  int nx,   //number of columns of the image
+  int type  //type of interpolation (quadratic or quartic)
 )
 {
   #pragma omp parallel for
@@ -394,6 +399,11 @@ void message(timeval &start, timeval &end)
 }  
 
 
+extern "C"
+{
+#include "iio.h"
+}
+
 
 /**
   *
@@ -401,26 +411,27 @@ void message(timeval &start, timeval &end)
   *
 **/
 void harris(
-  float *I,        // input image
-  vector<harris_corner> &corners, // output selected corners
-  int   gauss,     // type of Gaussian 
-  int   grad,      // type of gradient
-  int   measure,   // measure for the discriminant function
-  float k,         // Harris constant for the ....function
-  float sigma_d,   // standard deviation for smoothing (image denoising)    
-  float sigma_i,   // standard deviation for smoothing (pixel neighbourhood)
-  float Th,        // threshold for eliminating low values
-  int   strategy,  // strategy for the output corners
-  int   cells,     // number of regions in the image for distributed output
-  int   N,         // number of output corners
-  int   precision, // type of subpixel precision approximation
-  int   nx,        // number of columns of the image
-  int   ny,        // number of rows of the image
-  int   verbose    // activate verbose mode
+  float *I,        //input image
+  vector<harris_corner> &corners, //output selected corners
+  int   gauss,     //type of Gaussian 
+  int   grad,      //type of gradient
+  int   measure,   //measure for the discriminant function
+  float k,         //Harris constant for the ....function
+  float sigma_d,   //standard deviation for smoothing (image denoising)    
+  float sigma_i,   //standard deviation for smoothing (pixel neighbourhood)
+  float Th,        //threshold for eliminating low values
+  int   strategy,  //strategy for the output corners
+  int   cells,     //number of regions in the image for distributed output
+  int   N,         //number of output corners
+  int   precision, //type of subpixel precision approximation
+  int   nx,        //number of columns of the image
+  int   ny,        //number of rows of the image
+  int   verbose    //activate verbose mode
 )
 {
   struct timeval start, end;
   int size=nx*ny;
+  float *Is= new float[size];
   float *Ix= new float[size];
   float *Iy= new float[size];
   float *A = new float[size];
@@ -431,16 +442,24 @@ void harris(
   if(verbose) printf("\nHarris corner detection:\n");
 
   message(" 1.Smoothing the image: \t \t", start, verbose);
-  gaussian(I, nx, ny, sigma_d, gauss);
-
+  gaussian(I, Is, nx, ny, sigma_d, gauss);
+      
   message(" 2.Computing the gradient: \t \t", start, end, verbose);
-  gradient(I, Ix, Iy, nx, ny, grad);
+  gradient(Is, Ix, Iy, nx, ny, grad);
 
   message(" 3.Computing the autocorrelation: \t", start, end, verbose);
   compute_autocorrelation_matrix(Ix, Iy, A, B, C, sigma_i, nx, ny, gauss);
 
   message(" 4.Computing corner strength function: \t", start, end, verbose);
   compute_corner_response(A, B, C, R, measure, nx, ny, k);
+
+  /*iio_save_image_float_vec("gauss.png", Is, nx, ny, 1);
+  iio_save_image_float_vec("Ix.png", Ix, nx, ny, 1);
+  iio_save_image_float_vec("Iy.png", Iy, nx, ny, 1);
+  iio_save_image_float_vec("A.png", A, nx, ny, 1);
+  iio_save_image_float_vec("B.png", B, nx, ny, 1);
+  iio_save_image_float_vec("C.png", C, nx, ny, 1);
+  iio_save_image_float_vec("R.png", R, nx, ny, 1);*/
 
   message(" 5.Non-maximum suppression:  \t\t", start, end, verbose);
   non_maximum_suppression(R, corners, Th, 2*sigma_i, nx, ny);
@@ -460,11 +479,98 @@ void harris(
     printf(" * Number of corners detected: %ld\n", corners.size());
   }
   
+  delete []Is;
   delete []Ix;
   delete []Iy;
   delete []A;
   delete []B;
   delete []C;
   delete []R;
+}
+
+
+/**
+  *
+  * Function for computing the square distance of two corners at 
+  * two different scales
+  *
+**/
+float distance2(
+  harris_corner &c1, //corner at finest scale
+  harris_corner &c2  //corner at coarsest scale
+)
+{
+  float x=c1.x/2.;
+  float y=c1.y/2.;
+  
+  float dx=(c2.x-x);
+  float dy=(c2.y-y);
+  
+  return dx*dx+dy*dy;
+}
+
+
+/**
+  *
+  * Main function for computing Harris corners with scale test
+  *
+**/
+void harris_scale(
+  float *I,        //input image
+  vector<harris_corner> &corners, //output selected corners
+  int   gauss,     //type of Gaussian 
+  int   grad,      //type of gradient
+  int   measure,   //measure for the discriminant function
+  float k,         //Harris constant for the ....function
+  float sigma_d,   //standard deviation for smoothing (image denoising)    
+  float sigma_i,   //standard deviation for smoothing (pixel neighbourhood)
+  float Th,        //threshold for eliminating low values
+  int   strategy,  //strategy for the output corners
+  int   cells,     //number of regions in the image for distributed output
+  int   N,         //number of output corners
+  int   precision, //type of subpixel precision approximation
+  int   nx,        //number of columns of the image
+  int   ny,        //number of rows of the image
+  int   verbose    //activate verbose mode
+)
+{
+  vector<harris_corner> corners1, corners2; 
+
+  if(verbose) printf("\n*** Computing corners at finest scale ***\n");
+  
+  //compute Harris' corners at finest scale
+  harris(
+    I, corners1, gauss, grad, measure, k, sigma_d, 
+    sigma_i, Th, strategy, cells, N, precision, nx, ny, verbose
+  );
+
+  if(verbose) printf("\n*** Computing corners at zoom out of 2 ***\n");
+
+  //zoom out the image by a factor of two
+  float *Iz=zoom_out(I, nx, ny);
+
+  //compute Harris' corners at coarsest scale
+  harris(
+    Iz, corners2, gauss, grad, measure, k, sigma_d, 
+    sigma_i/2, Th, 0, 1, N, precision, nx/2, ny/2, verbose
+  );
+   
+  //select stable corners
+  for(unsigned int i=0; i<corners1.size(); i++)
+  {
+    unsigned int j=0;
+    
+    //search the corresponding corner
+    while(j<corners2.size() && 
+          distance2(corners1[i], corners2[j])>sigma_i*sigma_i) j++;
+  
+    if(j<corners2.size())
+      corners.push_back(corners1[i]);
+  }
+  
+  if(verbose)
+    printf("\nNumber of corners in both scales: %ld\n", corners.size());
+
+  delete []Iz;
 }
 

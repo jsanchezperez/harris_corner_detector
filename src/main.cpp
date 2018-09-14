@@ -1,3 +1,12 @@
+// This program is free software: you can use, modify and/or redistribute it
+// under the terms of the simplified BSD License. You should have received a
+// copy of this license along this program. If not, see
+// <http://www.opensource.org/licenses/bsd-license.html>.
+//
+// Copyright (C) 2018, Javier Sánchez Pérez <jsanchez@ulpgc.es>
+// All rights reserved.
+
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -23,6 +32,7 @@ extern "C"
 #define PAR_DEFAULT_GAUSSIAN FAST_GAUSSIAN
 #define PAR_DEFAULT_GRADIENT CENTRAL_DIFFERENCES
 #define PAR_DEFAULT_MEASURE HARRIS_MEASURE
+#define PAR_DEFAULT_SCALE_TEST 0
 #define PAR_DEFAULT_SELECT_STRATEGY ALL_CORNERS
 #define PAR_DEFAULT_CELLS 3
 #define PAR_DEFAULT_NSELECT 2000
@@ -60,6 +70,7 @@ void print_help(char *name)
   printf("              default value %f\n", PAR_DEFAULT_SIGMA_D);    
   printf("   -i N     Gaussian standard deviation for integration\n");
   printf("              default value %f\n", PAR_DEFAULT_SIGMA_I);
+  printf("   -z       switch on scale test for filtering corners\n");
   printf("   -t N     threshold for eliminating low values\n");
   printf("              default value %d\n", PAR_DEFAULT_THRESHOLD);
   printf("   -q N     strategy for selecting the output corners:\n");
@@ -95,6 +106,7 @@ int read_parameters(
   float &k,
   float &sigma_d,  
   float &sigma_i,
+  int   &scale_test,
   float &threshold,
   int   &strategy,
   int   &cells,
@@ -115,6 +127,7 @@ int read_parameters(
     k=PAR_DEFAULT_K;
     sigma_d=PAR_DEFAULT_SIGMA_D;    
     sigma_i=PAR_DEFAULT_SIGMA_I;
+    scale_test=PAR_DEFAULT_SCALE_TEST;
     gaussian=PAR_DEFAULT_GAUSSIAN;
     gradient=PAR_DEFAULT_GRADIENT;
     measure=PAR_DEFAULT_MEASURE;
@@ -156,6 +169,9 @@ int read_parameters(
       if(strcmp(argv[i],"-i")==0)
         if(i<argc-1)
           sigma_i=atof(argv[++i]);
+
+      if(strcmp(argv[i],"-z")==0)
+        scale_test=1;
         
       if(strcmp(argv[i],"-t")==0)
         if(i<argc-1)
@@ -262,14 +278,13 @@ void draw_points(
   #pragma omp parallel for
   for(unsigned int i=0;i<corners.size();i++)
   {
-    int x=corners[i].x;
-    int y=corners[i].y;
+    int x=corners[i].x+0.5;
+    int y=corners[i].y+0.5;
     
     if(x<1) x=1;
     if(y<1) y=1;
     if(x>nx-2) x=nx-2;
     if(y>ny-2) y=ny-2;
-    
     
     int x0=(x-radius<0)?0: x-radius;
     int x1=(x+radius>=nx)?nx-1: x+radius;
@@ -311,10 +326,10 @@ void draw_points(
       //draw vertical line
       for(int j=y0;j<=y1;j++)
           I[j*nx+x]=255;
+          
       //draw square in the center
       I[(y-1)*nx+x-1]=255; I[(y-1)*nx+x+1]=255;
       I[((y+1)*nx+x-1)*nz]=255; I[((y+1)*nx+x+1)*nz]=255;
-    
     }
   }
 }
@@ -328,9 +343,9 @@ void draw_points(
 void rgb2gray(
   float *rgb,  //input color image
   float *gray, //output grayscale image
-  int   nx,     //number of columns
-  int   ny,     //number of rows
-  int   nz      //number of channels
+  int   nx,    //number of columns
+  int   ny,    //number of rows
+  int   nz     //number of channels
 )
 {
   for(int i=0;i<nx*ny;i++)
@@ -349,13 +364,13 @@ int main(int argc, char *argv[])
   char  *image, *out_image=NULL, *out_file=NULL;
   float k, sigma_d, sigma_i, threshold;
   int   gaussian, gradient, strategy, Nselect, measure;
-  int   precision, cells, verbose;
+  int   scale_test, precision, cells, verbose;
 
   //read the parameters from the console
   int result=read_parameters(
         argc, argv, &image, &out_image, &out_file, 
-        gaussian, gradient, measure, k, sigma_d, sigma_i, threshold, 
-        strategy, cells, Nselect, precision, verbose
+        gaussian, gradient, measure, k, sigma_d, sigma_i, scale_test,
+        threshold, strategy, cells, Nselect, precision, verbose
       );
 
   if(result)
@@ -369,10 +384,10 @@ int main(int argc, char *argv[])
         "\nParameters:\n"
         "  input image: '%s', output image: '%s', output corner file: %s\n"
         "  gaussian: %d, gradient: %d, measure: %d, K: %f, sigma_d: %f  \n"
-        "  sigma_i: %f, threshold: %f, strategy: %d, Number of cells: %d\n"
-        "  N: %d, precision: %d, nx: %d, ny: %d, nz: %d\n",
+        "  sigma_i: %f, scale test: %d, threshold: %f, strategy: %d, \n"
+        "  N cells: %d, N: %d, precision: %d, nx: %d, ny: %d, nz: %d\n",
         image, out_image, out_file, gaussian, gradient, measure, k, 
-        sigma_d, sigma_i, threshold, strategy, cells, Nselect, 
+        sigma_d, sigma_i, scale_test, threshold, strategy, cells, Nselect, 
         precision, nx, ny, nz
       );
 
@@ -380,7 +395,7 @@ int main(int argc, char *argv[])
     {
       std::vector<harris_corner> corners;
       float *I=new float[nx*ny];
-      
+
       //convert image to grayscale
       if(nz>1)
         rgb2gray(Ic, I, nx, ny, nz);
@@ -388,12 +403,29 @@ int main(int argc, char *argv[])
         for(int i=0;i<nx*ny;i++)
           I[i]=Ic[i];
 
+      struct timeval start, end;
+      if(verbose) gettimeofday(&start, NULL);
+
       //compute Harris' corners
-      harris(
-        I, corners, gaussian, gradient, measure, k, sigma_d, 
-        sigma_i, threshold, strategy, cells, Nselect, 
-        precision, nx, ny, verbose
-      );
+      if(scale_test)
+        harris_scale(
+          I, corners, gaussian, gradient, measure, k, sigma_d, 
+          sigma_i, threshold, strategy, cells, Nselect, 
+          precision, nx, ny, verbose
+        );
+      else
+        harris(
+          I, corners, gaussian, gradient, measure, k, sigma_d, 
+          sigma_i, threshold, strategy, cells, Nselect, 
+          precision, nx, ny, verbose
+        );
+
+      if(verbose)
+      {
+        gettimeofday(&end, NULL);
+        printf("\nTime: %fs\n", ((end.tv_sec-start.tv_sec)* 1000000u + 
+            end.tv_usec - start.tv_usec) / 1.e6);
+      }
 
       if(out_image!=NULL)
       {

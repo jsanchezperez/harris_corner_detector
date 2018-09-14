@@ -23,7 +23,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include <immintrin.h>  //include AVX
 
 #ifndef M_PI
 /** \brief The constant pi */
@@ -154,17 +153,7 @@ inline long extension(long N, long n)
     //constant boundary conditions
     if (n < 0) return 0;
     else if(n >= N) return N-1;
-    
-    //deprecated
-    while (1)
-        if (n < 0)
-            n = -1 - n;         /* Reflect over n = -1/2.    */
-        else if (n >= N)
-            n = 2 * N - 1 - n;  /* Reflect over n = N - 1/2. */
-        else
-            break;
-        
-    return n;
+    else return n;
 }
 
 
@@ -294,7 +283,8 @@ void sii_gaussian_conv_image(sii_coeffs &c, float *dest,
  *
  */
 void discrete_gaussian(
-  float *I,       //input/output image
+  float *I,       //input image
+  float *Is,      //output image
   int   xdim,     //image width
   int   ydim,     //image height
   float sigma,    //Gaussian standard deviation
@@ -311,7 +301,7 @@ void discrete_gaussian(
   int    bdy  = ydim+size;
 
   if(size>xdim) return;
-
+        
   //compute the coefficients of the 1D convolution kernel
   double *B = new double[size];
   for (int i=0; i<size; i++)
@@ -352,7 +342,7 @@ void discrete_gaussian(
       for (int j = 1; j < size; j++)
         sum += B[j]*(R[i-j]+R[i+j]);
 
-      I[k*xdim+i-size] = sum;
+      Is[k*xdim+i-size] = sum;
     }
     delete []R;
   }
@@ -363,13 +353,13 @@ void discrete_gaussian(
   {
     double *T = new double[size+ydim+size];
     for (i=size; i<bdy; i++)
-      T[i] = I[(i-size)*xdim+k];
+      T[i] = Is[(i-size)*xdim+k];
            
     //reflecting boundary conditions
     for (i=0, j=bdy; i<size; i++, j++)
     {
-      T[i] = I[(size-i)*xdim+k];
-      T[j] = I[(ydim-i-1)*xdim+k];
+      T[i] = Is[(size-i)*xdim+k];
+      T[j] = Is[(ydim-i-1)*xdim+k];
     }
       
     for (i=size; i<bdy; i++)
@@ -379,7 +369,7 @@ void discrete_gaussian(
       for (j=1; j<size; j++)
         sum += B[j]*(T[i-j]+T[i+j]);
 
-      I[(i-size)*xdim+k] = sum;
+      Is[(i-size)*xdim+k] = sum;
     }
     delete[]T;
   }
@@ -394,7 +384,8 @@ void discrete_gaussian(
  *
  */
 void gaussian(
-  float *I,     //input/output image
+  float *I,     //input image
+  float *Is,    //output image
   int   nx,     //image width
   int   ny,     //image height
   float sigma,  //Gaussian sigma
@@ -404,17 +395,17 @@ void gaussian(
 {
   if(type==STD_GAUSSIAN)
     //using separable filters
-    discrete_gaussian(I, nx, ny, sigma, K);
-  else
+    discrete_gaussian(I, Is, nx, ny, sigma, K);
+  else if(type==FAST_GAUSSIAN)
   {
-    if(type==FAST_GAUSSIAN)
-    {
-      //using Stacked Integral Images
-      sii_coeffs c; 
-      sii_precomp(&c, sigma, K);
-      sii_gaussian_conv_image(c, I, I, nx, ny, 1);
-    }
+    //using Stacked Integral Images
+    sii_coeffs c; 
+    sii_precomp(&c, sigma, K);
+    sii_gaussian_conv_image(c, Is, I, nx, ny, 1);
   }
+  else      
+    for(int i=0; i<nx*ny; i++)
+      Is[i]=I[i];
 }
 
 

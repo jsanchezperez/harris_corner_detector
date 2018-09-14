@@ -1,9 +1,19 @@
+// This program is free software: you can use, modify and/or redistribute it
+// under the terms of the simplified BSD License. You should have received a
+// copy of this license along this program. If not, see
+// <http://www.opensource.org/licenses/bsd-license.html>.
+//
+// Copyright (C) 2018, Javier Sánchez Pérez <jsanchez@ulpgc.es>
+// All rights reserved.
+
+
+
 #ifndef _HARRIS_H
 #define _HARRIS_H
 
 #include<vector>
 
-//Measures for the Harris discriminant function
+//Measures for the corner strength function
 #define HARRIS_MEASURE 0
 #define SHI_TOMASI_MEASURE 1
 #define HARMONIC_MEAN_MEASURE 2
@@ -17,12 +27,22 @@
 
 /**
   *
-  * Structure for handling Harris' corners
+  * Structure for handling corners
   *
 **/
 struct harris_corner{
   float x,y; //position of the corner
   float R;   //corner strength
+
+  harris_corner(float xx, float yy, float RR)
+  {
+    x=xx; y=yy; R=RR;
+  }  
+  
+  harris_corner()
+  {
+    x=0; y=0; R=0;
+  }
 };
 
 
@@ -32,12 +52,12 @@ struct harris_corner{
   *
 **/
 void non_maximum_suppression(
-  float *R,             // input image
-  std::vector<harris_corner> &corners, // Harris' corners
-  float Th,             // threshold for low values
-  int   radius,         // window radius
-  int   nx,             // number of columns of the image
-  int   ny              // number of rows of the image
+  float *R,             //input data
+  std::vector<harris_corner> &corners, //Harris' corners
+  float Th,             //threshold for low values
+  int   radius,         //window radius
+  int   nx,             //number of columns of the image
+  int   ny              //number of rows of the image
 );
 
 
@@ -47,12 +67,12 @@ void non_maximum_suppression(
   *
 **/    
 void select_output_corners(
-  std::vector<harris_corner> &corners, // output selected corners
-  int strategy, // strategy for the output corners
-  int cells,    // number of regions in the image for distributed output
-  int N,        // number of output corners
-  int nx,       // number of columns of the image
-  int ny        // number of rows of the image
+  std::vector<harris_corner> &corners, //output selected corners
+  int strategy, //strategy for the output corners
+  int cells,    //number of regions in the image for distributed output
+  int N,        //number of output corners
+  int nx,       //number of columns of the image
+  int ny        //number of rows of the image
 );
 
 
@@ -62,11 +82,12 @@ void select_output_corners(
   *
 **/
 void compute_subpixel_precision(
-  float *R,  // corner strength function
-  std::vector<harris_corner> &corners, // selected corners
-  int nx,    // number of columns of the image
-  int type   // type of interpolation (quadratic or quartic)
+  float *R, //discriminant function
+  std::vector<harris_corner> &corners, //selected corners
+  int nx,   //number of columns of the image
+  int type  //type of interpolation (quadratic or quartic)
 );
+
 
 
 /**
@@ -75,6 +96,31 @@ void compute_subpixel_precision(
   *
 **/
 void harris(
+  float *I,        // input image
+  std::vector<harris_corner> &corners, // output selected cornersç
+  int   gauss,     // type of Gaussian 
+  int   grad,      // type of gradient
+  int   measure,   // measure for the discriminant function
+  float k,         // Harris constant for the ....function
+  float sigma_d,   // standard deviation for smoothing (image denoising)    
+  float sigma_i,   // standard deviation for smoothing (pixel neighbourhood)
+  float Th,        // threshold for eliminating low values
+  int   strategy,  // strategy for the output corners
+  int   cells,     // number of regions in the image for distributed output
+  int   N,         // number of output corners
+  int   precision, // enable subpixel precision
+  int   nx,        // number of columns of the image
+  int   ny,        // number of rows of the image
+  int   verbose    // activate verbose mode
+);
+
+
+/**
+  *
+  * Main function for computing Harris corners with scale test
+  *
+**/
+void harris_scale(
   float *I,        // input image
   std::vector<harris_corner> &corners, // output selected cornersç
   int   gauss,     // type of Gaussian 
