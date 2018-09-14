@@ -1,6 +1,6 @@
 CC=gcc
 CXX=g++
-CFLAGS=-O3 -fopenmp -Wall -Wextra
+CFLAGS=-g -Wall -Wextra -O3 #-fopenmp 
 LFLAGS=-lpng -ljpeg -ltiff -lm 
 CVFLAGS=$(shell pkg-config --cflags --libs opencv)
 
@@ -30,16 +30,19 @@ obj/harris.o: ../src/harris.cpp
 obj/bicubic_interpolation.o: bicubic_interpolation.cpp
 	$(CXX) -c $< -o $@ -std=c++11 $(CFLAGS) -Wno-unused -pedantic -DNDEBUG -D_GNU_SOURCE 
 
+obj/zoom.o: ../src/zoom.cpp ../src/zoom.h
+	$(CXX) -c $< -o $@ -std=c++11 $(CFLAGS) -Wno-unused -pedantic -DNDEBUG -D_GNU_SOURCE 
+
 obj/harris_opencv.o: harris_opencv.cpp
 	$(CXX) -c $< -o $@ -std=c++11 $(CFLAGS) -Wno-unused -pedantic -DNDEBUG -D_GNU_SOURCE 
 
 
 	
 # ------- test -------
-bin/test: test.cpp obj/bicubic_interpolation.o obj/harris.o obj/iio.o obj/gradient.o obj/gaussian.o obj/interpolation.o obj/harris_opencv.o
+bin/test: test.cpp obj/bicubic_interpolation.o obj/harris.o obj/iio.o obj/gradient.o obj/gaussian.o obj/interpolation.o  obj/zoom.o  obj/harris_opencv.o
 	$(CXX) -std=c++11 -o $@ $^ $(CFLAGS) $(LFLAGS) $(CVFLAGS)
 
 	
 clean:
 	rm -f obj/*.o bin/test tmp/*
-	rmdir bin obj tmp
+	rm -R bin obj tmp
