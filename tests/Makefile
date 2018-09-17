@@ -1,6 +1,6 @@
 CC=gcc
 CXX=g++
-CFLAGS=-g -Wall -Wextra -O3 #-fopenmp 
+CFLAGS=-O3 -Wall -Wextra -fopenmp 
 LFLAGS=-lpng -ljpeg -ltiff -lm 
 CVFLAGS=$(shell pkg-config --cflags --libs opencv)
 

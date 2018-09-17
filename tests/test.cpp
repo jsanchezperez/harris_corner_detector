@@ -132,7 +132,7 @@ float repetability_rate(
         while(j<s2.size() && distance(s1[i], s2[j])>=TOL*TOL) 
           j++;
 
-        //test if we found it
+        //check if we found it
         if(j<s2.size()) N++;
       }
    }
@@ -146,7 +146,7 @@ float repetability_rate(
         while(j<s1.size() && distance(s1[j], s2[i])>=TOL*TOL) 
           j++;
         
-        //test if we found it
+        //check if we found it
         if(j<s1.size()) N++;
       }
    }
@@ -290,7 +290,6 @@ void create_graphic(
         case AFFINE: {
           //scale image with Similarity
           nparams=6; //similarity transform
-          //float x=nx/2.-0.5;
           float y=ny/2.-0.5;
           T[1]=T[2]=T[4]=T[5]=0;
           T[0]=-alpha[i]*y;
@@ -424,8 +423,6 @@ int main(int argc, char *argv[])
         "no_gaussian.txt", opencv, NO_GAUSSIAN
       );
       
-      return 0;
-      
       create_graphic(
         Ic, nx, ny, nz, alpha, N, TOL, NTOL, GAUSSIAN, 
         "std_gaussian.txt", opencv, STD_GAUSSIAN
@@ -515,7 +512,7 @@ int main(int argc, char *argv[])
          Ic, nx, ny, nz, scales, N, TOL, NTOL, SCALE, "scale.txt", opencv
       );
 
-     //subpixel-graphic for a range of xi-repeatability
+      //subpixel-graphic for a range of xi-repeatability
       printf("Generating subpixel graphics:\n");
       inc=PI/(N-1.0);
       alpha[0]=0;

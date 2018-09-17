@@ -347,7 +347,7 @@ void bicubic_interpolation(
       
       //obtain the bicubic interpolation at position (uu, vv)
       output[i*nx+j]=bicubic_interpolation(
-	input, x, y, nx, ny, border_out
+        input, x, y, nx, ny, border_out
       );
     }
 }

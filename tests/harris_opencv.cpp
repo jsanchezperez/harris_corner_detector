@@ -84,16 +84,12 @@ void opencv_harris(
      printf("Time: %fs\n", ((end.tv_sec-start.tv_sec)* 1000000u + 
             end.tv_usec - start.tv_usec) / 1.e6);
      
-    // printf("  -Mc max=%f, Mc min=%f\n",max, min);     
-     //char name[200]= "harris_opencv.png";
-     //iio_save_image_float_vec(name, Mc, nx, ny, 1);
-       
-     printf(" 6.Non-maximum suppression:  \t\t");
+     printf(" 5.Non-maximum suppression:  \t\t");
      gettimeofday(&start, NULL);     
   }
 
   //apply non-maximum suppression to select salient corners
-  int radius=2*sigma_i;
+  int radius=2*sigma_i+0.5;
   non_maximum_suppression(Mc, corners, Th, radius, nx, ny);
 
   if (verbose) 
@@ -105,7 +101,7 @@ void opencv_harris(
 
   if (verbose) 
   {
-     printf(" 7.Selecting output corners:  \t\t");
+     printf(" 6.Selecting output corners:  \t\t");
      gettimeofday(&start, NULL);     
   }
 
@@ -124,7 +120,7 @@ void opencv_harris(
   {
     if (verbose)
     {
-       printf(" 8.Computing subpixel precision: \t");
+       printf(" 7.Computing subpixel precision: \t");
        gettimeofday(&start, NULL);
     }
 
