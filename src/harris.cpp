@@ -148,6 +148,7 @@ void non_maximum_suppression(
   int *skip = new int[nx*ny];
   
   //skip values under the threshold
+  #pragma omp parallel for
   for(int i=0; i<nx*ny; i++)
     if(R[i]<Th) skip[i]=1;
     else skip[i]=0;
@@ -405,6 +406,55 @@ void message(timeval &start, timeval &end)
 
 /**
   *
+  * Function for computing the square distance of two corners at 
+  * two different scales
+  *
+**/
+float distance2(
+  harris_corner &c1, //corner at fine scale
+  harris_corner &c2  //corner at coarse scale
+)
+{
+  float dx=(c2.x-c1.x/2.);
+  float dy=(c2.y-c1.y/2.);
+  
+  return dx*dx+dy*dy;
+}
+
+
+/**
+  *
+  * Function for selecting stable corners comparing 
+  * two different scales
+  *
+**/
+void select_corners(
+  vector<harris_corner> &corners,   //corners at fine scale
+  vector<harris_corner> &corners_z, //corners at coarse scale
+  float sigma_i
+)
+{
+  //select stable corners
+  vector<harris_corner> corners_t; 
+  for(unsigned int i=0; i<corners.size(); i++)
+  {
+    unsigned int j=0;
+    
+    //search the corresponding corner
+    while(j<corners_z.size() && 
+         distance2(corners[i], corners_z[j])>sigma_i*sigma_i) 
+      j++;
+ 
+    if(j<corners_z.size())
+      corners_t.push_back(corners[i]);
+  }
+ 
+  corners.swap(corners_t);
+} 
+
+
+/**
+  *
   * Main function for computing Harris corners
   *
 **/
@@ -486,55 +536,6 @@ void harris(
 
 /**
   *
-  * Function for computing the square distance of two corners at 
-  * two different scales
-  *
-**/
-float distance2(
-  harris_corner &c1, //corner at fine scale
-  harris_corner &c2  //corner at coarse scale
-)
-{
-  float dx=(c2.x-c1.x/2.);
-  float dy=(c2.y-c1.y/2.);
-  
-  return dx*dx+dy*dy;
-}
-
-
-/**
-  *
-  * Function for selecting stable corners comparing 
-  * two different scales
-  *
-**/
-void select_corners(
-  vector<harris_corner> &corners,   //corners at fine scale
-  vector<harris_corner> &corners_z, //corners at coarse scale
-  float sigma_i
-)
-{
-  //select stable corners
-  vector<harris_corner> corners_t; 
-  for(unsigned int i=0; i<corners.size(); i++)
-  {
-    unsigned int j=0;
-    
-    //search the corresponding corner
-    while(j<corners_z.size() && 
-         distance2(corners[i], corners_z[j])>sigma_i*sigma_i) 
-      j++;
- 
-    if(j<corners_z.size())
-      corners_t.push_back(corners[i]);
-  }
- 
-  corners.swap(corners_t);
-} 
-
-
-/**
-  *
   * Main function for computing Harris corners with scale test
   *
 **/
@@ -560,7 +561,7 @@ void harris_scale(
 {
   if(Nscales<=1 || nx<=64 || ny<=64)
   {
-    //compute Harris' corners
+    //compute Harris' corners at coarsest scale
     harris(
       I, corners, gauss, grad, measure, k, sigma_d, sigma_i, 
       Th, strategy, cells, N, precision, nx, ny, verbose
@@ -571,7 +572,7 @@ void harris_scale(
     //zoom out the image by a factor of 2
     float *Iz=zoom_out(I, nx, ny);
     
-    //compute Harris' corners in the coarse scale (recursive)
+    //compute Harris' corners at the coarse scale (recursive)
     vector<harris_corner> corners_z; 
     harris_scale(
       Iz, corners_z, Nscales-1, gauss, grad, measure, k, sigma_d, 
@@ -580,7 +581,7 @@ void harris_scale(
     
     delete []Iz;
 
-    //compute Harris' corners in the fine scale
+    //compute Harris' corners at the current scale
     harris(
       I, corners, gauss, grad, measure, k, sigma_d, sigma_i, 
       Th, strategy, cells, N, precision, nx, ny, verbose

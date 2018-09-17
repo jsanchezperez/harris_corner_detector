@@ -34,7 +34,7 @@ Universidad de Las Palmas de Gran Canaria
 VERSION
 *******
 
-Version 1, released on September 15, 2018
+Version 1, released on September 20, 2018
 
 
 *******
@@ -79,6 +79,8 @@ accompanying IPOL article. Usage instructions:
   --------
    -o name  output image with detected corners 
    -f name  write points to file
+   -z N     number of scales for filtering out corners
+              default value 1
    -s N     choose smoothing: 
               0.precise Gaussian; 1.fast Gaussian; 2.no Gaussian
               default value 1
@@ -94,7 +96,6 @@ accompanying IPOL article. Usage instructions:
               default value 1.000000
    -i N     Gaussian standard deviation for integration
               default value 2.500000
-   -z       switch on scale test for filtering corners
    -t N     threshold for eliminating low values
               default value 130
    -q N     strategy for selecting the output corners:
@@ -109,6 +110,7 @@ accompanying IPOL article. Usage instructions:
               0.no subpixel; 1.quadratic approximation; 2.quartic interpolation
               default value 1
    -v       switch on verbose mode 
+
 
 
 Execution examples:
