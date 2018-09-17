@@ -37,13 +37,17 @@ void central_differences(
     //copy first and last rows
     for(int i=1; i<nx-1; i++)
     {
-      dx[i] = dx[i+nx];
-      dx[nx*(ny-1)+i] = dx[nx*(ny-2)+i];
+      dx[i]=dx[i+nx];
+      dx[nx*(ny-1)+i]=dx[nx*(ny-2)+i];
+      dy[i]=dy[i+nx];
+      dy[nx*(ny-1)+i]=dy[nx*(ny-2)+i];
     }
 
     //copy first and last columns
     for(int i=0; i<ny; i++)
     {
+      dx[i*nx]=dx[i*nx+1];
+      dx[(i+1)*nx-1]=dx[(i+1)*nx-2];
       dy[i*nx]=dy[i*nx+1];
       dy[(i+1)*nx-1]=dy[(i+1)*nx-2];
     }
@@ -81,13 +85,17 @@ void sobel_operator(
     //copy first and last rows
     for(int i=1; i<nx-1; i++)
     {
-      dx[i] = dx[i+nx];
-      dx[nx*(ny-1)+i] = dx[nx*(ny-2)+i];
+      dx[i]=dx[i+nx];
+      dx[nx*(ny-1)+i]=dx[nx*(ny-2)+i];
+      dy[i]=dy[i+nx];
+      dy[nx*(ny-1)+i]=dy[nx*(ny-2)+i];
     }
 
     //copy first and last columns
     for(int i=0; i<ny; i++)
     {
+      dx[i*nx]=dx[i*nx+1];
+      dx[(i+1)*nx-1]=dx[(i+1)*nx-2];
       dy[i*nx]=dy[i*nx+1];
       dy[(i+1)*nx-1]=dy[(i+1)*nx-2];
     }
@@ -102,15 +110,15 @@ void sobel_operator(
 **/
 void gradient(
   float *I,  //input image
-  float *dx, //computed x derivative
-  float *dy, //computed y derivative
+  float *Ix, //computed x derivative
+  float *Iy, //computed y derivative
   int   nx,  //image width
   int   ny,  //image height
   int   type //type of gradient
 )
 {
   if(type==SOBEL_OPERATOR)
-    sobel_operator(I, dx, dy, nx, ny);
+    sobel_operator(I, Ix, Iy, nx, ny);
   else
-    central_differences(I, dx, dy, nx, ny);
+    central_differences(I, Ix, Iy, nx, ny);
 }

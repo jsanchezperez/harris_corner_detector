@@ -20,6 +20,7 @@
 
 using namespace std;
 
+
 /**
   *
   * Overload less than function to compare two corners
@@ -30,7 +31,7 @@ bool operator<(
   const harris_corner &c2
 ) 
 {
-  //inverse order
+  //inverse sort
   return c1.R > c2.R;
 }
 
@@ -46,10 +47,10 @@ void compute_autocorrelation_matrix(
   float *A,    //first coefficient of the autocorrelation matrix: G*(IxIx)
   float *B,    //symmetric coefficient of the autocorrelation matrix: G*(IxIy)
   float *C,    //last coefficient of the autocorrelation matrix: G*(IyIy)
-  float sigma, //standard deviation for smoothing (pixel neighbourhood)
+  float sigma, //standard deviation for smoothing 
   int   nx,    //number of columns of the image
   int   ny,    //number of rows of the image
-  int   gauss  // type of Gaussian 
+  int   gauss  //type of Gaussian 
 
 )
 {
@@ -91,16 +92,29 @@ void compute_corner_response(
   switch(measure) 
   {
     default: case HARRIS_MEASURE:
+      #pragma omp parallel for
       for (int i=0; i<size; i++)
       {
-        float detA   = A[i]*C[i] - B[i]*B[i];
-        float traceA = A[i] + C[i];
+        float detA  =A[i]*C[i]-B[i]*B[i];
+        float traceA=A[i]+C[i];
 
-        R[i] = detA - k*traceA*traceA;          
+        R[i]=detA-k*traceA*traceA;          
+      }
+      break;
+
+    case SHI_TOMASI_MEASURE:
+      #pragma omp parallel for
+      for (int i=0; i<size; i++)
+      {
+        float D=sqrt(A[i]*A[i]-2*A[i]*C[i]+4*B[i]*B[i]+C[i]*C[i]);
+        float lmin=0.5*(A[i]+C[i])-0.5*D;
+
+        R[i]=lmin;
       }
       break;
 
     case HARMONIC_MEAN_MEASURE: 
+      #pragma omp parallel for
       for (int i=0; i<size; i++)
       {
         float detA  =A[i]*C[i]-B[i]*B[i];
@@ -109,16 +123,6 @@ void compute_corner_response(
         R[i]=2*detA/(traceA+0.0001);
       }
       break;
-
-    case SHI_TOMASI_MEASURE:
-      for (int i=0; i<size; i++)
-      {
-        float D = sqrt(A[i]*A[i]-2*A[i]*C[i]+4*B[i]*B[i]+C[i]*C[i]);
-        float lmin = 0.5*(A[i]+C[i])-0.5*D;
-
-        R[i]=lmin;
-      }
-     break;
   }
 }
 
@@ -137,13 +141,13 @@ void non_maximum_suppression(
   int   ny              //number of rows of the image
 )
 {
-  //check if the image is too small for the chosen radius
-  if(ny<=2*radius || nx<=2*radius) return;
+  //check parameters
+  if(ny<=2*radius+1 || nx<=2*radius+1) return;
+  if(radius<1) radius=1;
   
   int *skip = new int[nx*ny];
   
   //skip values under the threshold
-  #pragma omp parallel for
   for(int i=0; i<nx*ny; i++)
     if(R[i]<Th) skip[i]=1;
     else skip[i]=0;
@@ -186,13 +190,13 @@ void non_maximum_suppression(
           while(p2>=j-radius && R[i*nx+p2]<=R[i*nx+j])
             p2--;
   
-          //if not found, test the 2D region
+          //if not found, check the 2D region
           if(p2<j-radius)
           {
             int k=i+radius; 
             bool found=false;
 
-            //first test the bottom region (backwards)
+            //first check the bottom region (backwards)
             while(!found && k>i)
             {
               int l=j+radius;
@@ -208,7 +212,7 @@ void non_maximum_suppression(
             
             k=i-radius; 
 
-            //then test the top region (forwards)
+            //then check the top region (forwards)
             while(!found && k<i)
             {
               int l=j-radius;
@@ -332,8 +336,8 @@ void compute_subpixel_precision(
   #pragma omp parallel for
   for(unsigned int i=0; i<corners.size(); i++)
   {
-    const float x=corners[i].x;
-    const float y=corners[i].y;
+    int x=corners[i].x;
+    int y=corners[i].y;
    
     int mx=x-1;
     int dx=x+1;
@@ -342,13 +346,13 @@ void compute_subpixel_precision(
     
     float M[9];
     M[0]=R[my*nx+mx];
-    M[1]=R[my*nx+(int)x];
+    M[1]=R[my*nx+ x];
     M[2]=R[my*nx+dx];
-    M[3]=R[(int)y*nx+mx];
-    M[4]=R[(int)y*nx+(int)x];
-    M[5]=R[(int)y*nx+dx];
+    M[3]=R[y *nx+mx];
+    M[4]=R[y *nx+ x];
+    M[5]=R[y *nx+dx];
     M[6]=R[dy*nx+mx];
-    M[7]=R[dy*nx+(int)x];
+    M[7]=R[dy*nx+ x];
     M[8]=R[dy*nx+dx];
         
     if(type==QUADRATIC_APPROXIMATION)
@@ -399,12 +403,6 @@ void message(timeval &start, timeval &end)
 }  
 
 
-extern "C"
-{
-#include "iio.h"
-}
-
-
 /**
   *
   * Main function for computing Harris corners
@@ -429,23 +427,29 @@ void harris(
   int   verbose    //activate verbose mode
 )
 {
+  //check the dimensions of the image
+  if(nx<3 || ny<3) return;
+  
   struct timeval start, end;
   int size=nx*ny;
-  float *Is= new float[size];
-  float *Ix= new float[size];
-  float *Iy= new float[size];
-  float *A = new float[size];
-  float *B = new float[size];
-  float *C = new float[size];
-  float *R = new float[size];
+  float *Ix=new float[size];
+  float *Iy=new float[size];
+  float *A =new float[size];
+  float *B =new float[size];
+  float *C =new float[size];
+  float *R =new float[size];
   
-  if(verbose) printf("\nHarris corner detection:\n");
+  if(verbose) 
+  {
+    printf("\nHarris corner detection:\n");
+    printf("[nx=%d, ny=%d, sigma_i=%f]\n", nx, ny, sigma_i);
+  }
 
   message(" 1.Smoothing the image: \t \t", start, verbose);
-  gaussian(I, Is, nx, ny, sigma_d, gauss);
-      
+  gaussian(I, I, nx, ny, sigma_d, gauss);
+  
   message(" 2.Computing the gradient: \t \t", start, end, verbose);
-  gradient(Is, Ix, Iy, nx, ny, grad);
+  gradient(I, Ix, Iy, nx, ny, grad);
 
   message(" 3.Computing the autocorrelation: \t", start, end, verbose);
   compute_autocorrelation_matrix(Ix, Iy, A, B, C, sigma_i, nx, ny, gauss);
@@ -453,16 +457,8 @@ void harris(
   message(" 4.Computing corner strength function: \t", start, end, verbose);
   compute_corner_response(A, B, C, R, measure, nx, ny, k);
 
-  /*iio_save_image_float_vec("gauss.png", Is, nx, ny, 1);
-  iio_save_image_float_vec("Ix.png", Ix, nx, ny, 1);
-  iio_save_image_float_vec("Iy.png", Iy, nx, ny, 1);
-  iio_save_image_float_vec("A.png", A, nx, ny, 1);
-  iio_save_image_float_vec("B.png", B, nx, ny, 1);
-  iio_save_image_float_vec("C.png", C, nx, ny, 1);
-  iio_save_image_float_vec("R.png", R, nx, ny, 1);*/
-
   message(" 5.Non-maximum suppression:  \t\t", start, end, verbose);
-  non_maximum_suppression(R, corners, Th, 2*sigma_i, nx, ny);
+  non_maximum_suppression(R, corners, Th, 2*sigma_i+0.5, nx, ny);
 
   message(" 6.Selecting output corners:  \t\t", start, end, verbose);
   select_output_corners(corners, strategy, cells, N, nx, ny);
@@ -479,7 +475,6 @@ void harris(
     printf(" * Number of corners detected: %ld\n", corners.size());
   }
   
-  delete []Is;
   delete []Ix;
   delete []Iy;
   delete []A;
@@ -496,18 +491,46 @@ void harris(
   *
 **/
 float distance2(
-  harris_corner &c1, //corner at finest scale
-  harris_corner &c2  //corner at coarsest scale
+  harris_corner &c1, //corner at fine scale
+  harris_corner &c2  //corner at coarse scale
 )
 {
-  float x=c1.x/2.;
-  float y=c1.y/2.;
-  
-  float dx=(c2.x-x);
-  float dy=(c2.y-y);
+  float dx=(c2.x-c1.x/2.);
+  float dy=(c2.y-c1.y/2.);
   
   return dx*dx+dy*dy;
 }
+
+
+/**
+  *
+  * Function for selecting stable corners comparing 
+  * two different scales
+  *
+**/
+void select_corners(
+  vector<harris_corner> &corners,   //corners at fine scale
+  vector<harris_corner> &corners_z, //corners at coarse scale
+  float sigma_i
+)
+{
+  //select stable corners
+  vector<harris_corner> corners_t; 
+  for(unsigned int i=0; i<corners.size(); i++)
+  {
+    unsigned int j=0;
+    
+    //search the corresponding corner
+    while(j<corners_z.size() && 
+         distance2(corners[i], corners_z[j])>sigma_i*sigma_i) 
+      j++;
+ 
+    if(j<corners_z.size())
+      corners_t.push_back(corners[i]);
+  }
+ 
+  corners.swap(corners_t);
+} 
 
 
 /**
@@ -518,6 +541,7 @@ float distance2(
 void harris_scale(
   float *I,        //input image
   vector<harris_corner> &corners, //output selected corners
+  int   Nscales,   //number of scales for checking the stability of corners
   int   gauss,     //type of Gaussian 
   int   grad,      //type of gradient
   int   measure,   //measure for the discriminant function
@@ -534,43 +558,39 @@ void harris_scale(
   int   verbose    //activate verbose mode
 )
 {
-  vector<harris_corner> corners1, corners2; 
-
-  if(verbose) printf("\n*** Computing corners at finest scale ***\n");
-  
-  //compute Harris' corners at finest scale
-  harris(
-    I, corners1, gauss, grad, measure, k, sigma_d, 
-    sigma_i, Th, strategy, cells, N, precision, nx, ny, verbose
-  );
-
-  if(verbose) printf("\n*** Computing corners at zoom out of 2 ***\n");
-
-  //zoom out the image by a factor of two
-  float *Iz=zoom_out(I, nx, ny);
-
-  //compute Harris' corners at coarsest scale
-  harris(
-    Iz, corners2, gauss, grad, measure, k, sigma_d, 
-    sigma_i/2, Th, 0, 1, N, precision, nx/2, ny/2, verbose
-  );
-   
-  //select stable corners
-  for(unsigned int i=0; i<corners1.size(); i++)
+  if(Nscales<=1 || nx<=64 || ny<=64)
   {
-    unsigned int j=0;
+    //compute Harris' corners
+    harris(
+      I, corners, gauss, grad, measure, k, sigma_d, sigma_i, 
+      Th, strategy, cells, N, precision, nx, ny, verbose
+    );
+  } 
+  else
+  {
+    //zoom out the image by a factor of 2
+    float *Iz=zoom_out(I, nx, ny);
     
-    //search the corresponding corner
-    while(j<corners2.size() && 
-          distance2(corners1[i], corners2[j])>sigma_i*sigma_i) j++;
-  
-    if(j<corners2.size())
-      corners.push_back(corners1[i]);
-  }
-  
-  if(verbose)
-    printf("\nNumber of corners in both scales: %ld\n", corners.size());
+    //compute Harris' corners in the coarse scale (recursive)
+    vector<harris_corner> corners_z; 
+    harris_scale(
+      Iz, corners_z, Nscales-1, gauss, grad, measure, k, sigma_d, 
+      sigma_i/2, Th, strategy, cells, N, precision, nx/2, ny/2, verbose
+    );
+    
+    delete []Iz;
 
-  delete []Iz;
+    //compute Harris' corners in the fine scale
+    harris(
+      I, corners, gauss, grad, measure, k, sigma_d, sigma_i, 
+      Th, strategy, cells, N, precision, nx, ny, verbose
+    );
+
+    //select stable corners
+    select_corners(corners, corners_z, sigma_i);
+    
+    if(verbose)
+      printf(" * Number of corners after scale check: %ld\n", corners.size());
+  }
 }
 

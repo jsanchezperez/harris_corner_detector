@@ -96,22 +96,22 @@ void compute_subpixel_precision(
   *
 **/
 void harris(
-  float *I,        // input image
-  std::vector<harris_corner> &corners, // output selected cornersç
-  int   gauss,     // type of Gaussian 
-  int   grad,      // type of gradient
-  int   measure,   // measure for the discriminant function
-  float k,         // Harris constant for the ....function
-  float sigma_d,   // standard deviation for smoothing (image denoising)    
-  float sigma_i,   // standard deviation for smoothing (pixel neighbourhood)
-  float Th,        // threshold for eliminating low values
-  int   strategy,  // strategy for the output corners
-  int   cells,     // number of regions in the image for distributed output
-  int   N,         // number of output corners
-  int   precision, // enable subpixel precision
-  int   nx,        // number of columns of the image
-  int   ny,        // number of rows of the image
-  int   verbose    // activate verbose mode
+  float *I,        //input image
+  std::vector<harris_corner> &corners, //output selected corners
+  int   gauss,     //type of Gaussian 
+  int   grad,      //type of gradient
+  int   measure,   //measure for the discriminant function
+  float k,         //Harris constant for the ....function
+  float sigma_d,   //standard deviation for smoothing (image denoising)    
+  float sigma_i,   //standard deviation for smoothing (pixel neighbourhood)
+  float Th,        //threshold for eliminating low values
+  int   strategy,  //strategy for the output corners
+  int   cells,     //number of regions in the image for distributed output
+  int   N,         //number of output corners
+  int   precision, //type of subpixel precision approximation
+  int   nx,        //number of columns of the image
+  int   ny,        //number of rows of the image
+  int   verbose    //activate verbose mode
 );
 
 
@@ -121,22 +121,23 @@ void harris(
   *
 **/
 void harris_scale(
-  float *I,        // input image
-  std::vector<harris_corner> &corners, // output selected cornersç
-  int   gauss,     // type of Gaussian 
-  int   grad,      // type of gradient
-  int   measure,   // measure for the discriminant function
-  float k,         // Harris constant for the ....function
-  float sigma_d,   // standard deviation for smoothing (image denoising)    
-  float sigma_i,   // standard deviation for smoothing (pixel neighbourhood)
-  float Th,        // threshold for eliminating low values
-  int   strategy,  // strategy for the output corners
-  int   cells,     // number of regions in the image for distributed output
-  int   N,         // number of output corners
-  int   precision, // enable subpixel precision
-  int   nx,        // number of columns of the image
-  int   ny,        // number of rows of the image
-  int   verbose    // activate verbose mode
+  float *I,        //input image
+  std::vector<harris_corner> &corners, //output selected corners
+  int   Nscales,   //number of scales for checking the stability of corners
+  int   gauss,     //type of Gaussian 
+  int   grad,      //type of gradient
+  int   measure,   //measure for the discriminant function
+  float k,         //Harris constant for the ....function
+  float sigma_d,   //standard deviation for smoothing (image denoising)    
+  float sigma_i,   //standard deviation for smoothing (pixel neighbourhood)
+  float Th,        //threshold for eliminating low values
+  int   strategy,  //strategy for the output corners
+  int   cells,     //number of regions in the image for distributed output
+  int   N,         //number of output corners
+  int   precision, //type of subpixel precision approximation
+  int   nx,        //number of columns of the image
+  int   ny,        //number of rows of the image
+  int   verbose    //activate verbose mode
 );
 
 #endif

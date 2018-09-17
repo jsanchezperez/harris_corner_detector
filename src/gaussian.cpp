@@ -293,7 +293,11 @@ void discrete_gaussian(
 {
   int i, j, k;
 
-  if(sigma<=0 || precision<0) return;
+  if(sigma<=0 || precision<=0){
+    #pragma omp parallel for
+    for(int i=0; i<xdim*ydim; i++) Is[i] = I[i];
+    return;
+  }
   
   double den  = 2*sigma*sigma;
   int    size = (int) (precision*sigma)+1;
@@ -396,6 +400,7 @@ void gaussian(
   if(type==STD_GAUSSIAN)
     //using separable filters
     discrete_gaussian(I, Is, nx, ny, sigma, K);
+    
   else if(type==FAST_GAUSSIAN)
   {
     //using Stacked Integral Images
@@ -403,7 +408,8 @@ void gaussian(
     sii_precomp(&c, sigma, K);
     sii_gaussian_conv_image(c, Is, I, nx, ny, 1);
   }
-  else      
+  else
+    #pragma omp parallel for
     for(int i=0; i<nx*ny; i++)
       Is[i]=I[i];
 }

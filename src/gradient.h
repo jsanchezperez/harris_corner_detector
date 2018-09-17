@@ -21,8 +21,8 @@
 **/
 void gradient(
   float *I,  //input image
-  float *dx, //computed x derivative
-  float *dy, //computed y derivative
+  float *Ix, //computed x derivative
+  float *Iy, //computed y derivative
   int   nx,  //image width
   int   ny,  //image height
   int   type //type of gradient

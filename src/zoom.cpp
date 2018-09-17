@@ -7,9 +7,6 @@
 // All rights reserved.
 
 
-
-#include "gaussian.h"
-
 /**
   *
   * Boundary condition
@@ -72,17 +69,15 @@ float bicubic_interpolation_at(
   int    ny     //image height
 )
 {
-  int x, y, mx, my, dx, dy, ddx, ddy;
-
-  //apply the corresponding boundary conditions
-  x   = bc((int) uu, nx);
-  y   = bc((int) vv, ny);
-  mx  = bc((int) uu - 1, nx);
-  my  = bc((int) vv - 1, ny);
-  dx  = bc((int) uu + 1, nx);
-  dy  = bc((int) vv + 1, ny);
-  ddx = bc((int) uu + 2, nx);
-  ddy = bc((int) vv + 2, ny);
+  //apply boundary conditions
+  int x   = bc((int) uu, nx);
+  int y   = bc((int) vv, ny);
+  int mx  = bc((int) uu - 1, nx);
+  int my  = bc((int) vv - 1, ny);
+  int dx  = bc((int) uu + 1, nx);
+  int dy  = bc((int) vv + 1, ny);
+  int ddx = bc((int) uu + 2, nx);
+  int ddy = bc((int) vv + 2, ny);
 
   //obtain the interpolation points of the image
   float p11 = input[mx  + nx * my];
@@ -130,28 +125,14 @@ float *zoom_out(
 )
 {
   int nxx=nx/2, nyy=ny/2;
-  float *Is=new float[nx*ny];
   float *Iz=new float[nxx*nyy];
-
-  //copy the input image
-  for(int i=0; i<nx*ny; i++) Is[i]=I[i];
   
-  //smooth the input image
-  gaussian(I, Is, nx, ny, 1, STD_GAUSSIAN);
-
   //zoom out the image using bicubic interpolation
   #pragma omp parallel for
-  for (int i1 = 0; i1 < nyy; i1++)
-    for (int j1 = 0; j1 < nxx; j1++)
-    {
-      float i2=(float) i1*2;
-      float j2=(float) j1*2;
+  for (int i1=0; i1<nyy; i1++)
+    for (int j1=0; j1<nxx; j1++)
+      Iz[i1*nxx+j1]=bicubic_interpolation_at(I, j1*2, i1*2, nx, ny);
 
-      float g = bicubic_interpolation_at(Is, j2, i2, nx, ny);
-      Iz[i1 * nxx + j1] = g;
-    }
-	   
-  delete []Is;   
   return Iz;
 }
 

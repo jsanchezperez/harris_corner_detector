@@ -25,6 +25,7 @@ extern "C"
 #include "iio.h"
 }
 
+#define PAR_DEFAULT_NSCALES 1
 #define PAR_DEFAULT_K 0.06
 #define PAR_DEFAULT_SIGMA_D 1.0
 #define PAR_DEFAULT_SIGMA_I 2.5
@@ -32,7 +33,6 @@ extern "C"
 #define PAR_DEFAULT_GAUSSIAN FAST_GAUSSIAN
 #define PAR_DEFAULT_GRADIENT CENTRAL_DIFFERENCES
 #define PAR_DEFAULT_MEASURE HARRIS_MEASURE
-#define PAR_DEFAULT_SCALE_TEST 0
 #define PAR_DEFAULT_SELECT_STRATEGY ALL_CORNERS
 #define PAR_DEFAULT_CELLS 3
 #define PAR_DEFAULT_NSELECT 2000
@@ -55,6 +55,8 @@ void print_help(char *name)
   printf("  --------\n");
   printf("   -o name  output image with detected corners \n");
   printf("   -f name  write points to file\n");
+  printf("   -z N     number of scales for filtering out corners\n");
+  printf("              default value %d\n", PAR_DEFAULT_NSCALES);
   printf("   -s N     choose smoothing: \n"); 
   printf("              0.precise Gaussian; 1.fast Gaussian; 2.no Gaussian\n"); 
   printf("              default value %d\n", PAR_DEFAULT_GAUSSIAN);
@@ -70,7 +72,6 @@ void print_help(char *name)
   printf("              default value %f\n", PAR_DEFAULT_SIGMA_D);    
   printf("   -i N     Gaussian standard deviation for integration\n");
   printf("              default value %f\n", PAR_DEFAULT_SIGMA_I);
-  printf("   -z       switch on scale test for filtering corners\n");
   printf("   -t N     threshold for eliminating low values\n");
   printf("              default value %d\n", PAR_DEFAULT_THRESHOLD);
   printf("   -q N     strategy for selecting the output corners:\n");
@@ -100,13 +101,13 @@ int read_parameters(
   char  **image,  
   char  **out_image,
   char  **out_file,
+  int   &Nscales,
   int   &gaussian,
   int   &gradient,
   int   &measure,
   float &k,
   float &sigma_d,  
   float &sigma_i,
-  int   &scale_test,
   float &threshold,
   int   &strategy,
   int   &cells,
@@ -124,10 +125,10 @@ int read_parameters(
     *image=argv[i++];
 
     //assign default values to the parameters
+    Nscales=PAR_DEFAULT_NSCALES;
     k=PAR_DEFAULT_K;
     sigma_d=PAR_DEFAULT_SIGMA_D;    
     sigma_i=PAR_DEFAULT_SIGMA_I;
-    scale_test=PAR_DEFAULT_SCALE_TEST;
     gaussian=PAR_DEFAULT_GAUSSIAN;
     gradient=PAR_DEFAULT_GRADIENT;
     measure=PAR_DEFAULT_MEASURE;
@@ -149,15 +150,22 @@ int read_parameters(
         if(i<argc-1)
           *out_file=argv[++i];
       
+      if(strcmp(argv[i],"-z")==0)
+        if(i<argc-1)
+          Nscales=atoi(argv[++i]);
+
       if(strcmp(argv[i],"-s")==0)
-        gaussian=atoi(argv[++i]);
+        if(i<argc-1)
+          gaussian=atoi(argv[++i]);
 
       if(strcmp(argv[i],"-g")==0)
-        gradient=atoi(argv[++i]);
+        if(i<argc-1)
+          gradient=atoi(argv[++i]);
 
       if(strcmp(argv[i],"-m")==0)
-        measure=atoi(argv[++i]);
-
+        if(i<argc-1)
+          measure=atoi(argv[++i]);
+ 
       if(strcmp(argv[i],"-k")==0)
         if(i<argc-1)
           k=atof(argv[++i]);
@@ -169,9 +177,6 @@ int read_parameters(
       if(strcmp(argv[i],"-i")==0)
         if(i<argc-1)
           sigma_i=atof(argv[++i]);
-
-      if(strcmp(argv[i],"-z")==0)
-        scale_test=1;
         
       if(strcmp(argv[i],"-t")==0)
         if(i<argc-1)
@@ -200,6 +205,7 @@ int read_parameters(
     }
 
     //check parameter values
+    if(Nscales<1) Nscales = PAR_DEFAULT_NSCALES;
     if(k<=0)      k       = PAR_DEFAULT_K;
     if(sigma_d<0) sigma_d = PAR_DEFAULT_SIGMA_D;
     if(sigma_i<0) sigma_i = PAR_DEFAULT_SIGMA_I;
@@ -364,12 +370,12 @@ int main(int argc, char *argv[])
   char  *image, *out_image=NULL, *out_file=NULL;
   float k, sigma_d, sigma_i, threshold;
   int   gaussian, gradient, strategy, Nselect, measure;
-  int   scale_test, precision, cells, verbose;
+  int   Nscales, precision, cells, verbose;
 
   //read the parameters from the console
   int result=read_parameters(
-        argc, argv, &image, &out_image, &out_file, 
-        gaussian, gradient, measure, k, sigma_d, sigma_i, scale_test,
+        argc, argv, &image, &out_image, &out_file, Nscales,
+        gaussian, gradient, measure, k, sigma_d, sigma_i,
         threshold, strategy, cells, Nselect, precision, verbose
       );
 
@@ -382,12 +388,12 @@ int main(int argc, char *argv[])
     if(verbose)
       printf(
         "\nParameters:\n"
-        "  input image: '%s', output image: '%s', output corner file: %s\n"
-        "  gaussian: %d, gradient: %d, measure: %d, K: %f, sigma_d: %f  \n"
-        "  sigma_i: %f, scale test: %d, threshold: %f, strategy: %d, \n"
-        "  N cells: %d, N: %d, precision: %d, nx: %d, ny: %d, nz: %d\n",
-        image, out_image, out_file, gaussian, gradient, measure, k, 
-        sigma_d, sigma_i, scale_test, threshold, strategy, cells, Nselect, 
+        "  input image: %s\n  output image: %s\n  output file: %s\n"
+        "  Nscales: %d, gaussian: %d, gradient: %d, measure: %d, K: %f, \n"
+        "  sigma_d: %f, sigma_i: %f, threshold: %f, strategy: %d, \n"
+        "  cells: %d, N: %d, precision: %d, nx: %d, ny: %d, nz: %d\n",
+        image, out_image, out_file, Nscales, gaussian, gradient, measure, 
+        k, sigma_d, sigma_i, threshold, strategy, cells, Nselect, 
         precision, nx, ny, nz
       );
 
@@ -407,19 +413,12 @@ int main(int argc, char *argv[])
       if(verbose) gettimeofday(&start, NULL);
 
       //compute Harris' corners
-      if(scale_test)
-        harris_scale(
-          I, corners, gaussian, gradient, measure, k, sigma_d, 
-          sigma_i, threshold, strategy, cells, Nselect, 
-          precision, nx, ny, verbose
-        );
-      else
-        harris(
-          I, corners, gaussian, gradient, measure, k, sigma_d, 
-          sigma_i, threshold, strategy, cells, Nselect, 
-          precision, nx, ny, verbose
-        );
-
+      harris_scale(
+        I, corners, Nscales, gaussian, gradient, measure, k, 
+        sigma_d, sigma_i, threshold, strategy, cells, Nselect, 
+        precision, nx, ny, verbose
+      );
+    
       if(verbose)
       {
         gettimeofday(&end, NULL);
@@ -429,7 +428,7 @@ int main(int argc, char *argv[])
 
       if(out_image!=NULL)
       {
-        draw_points(Ic, corners, strategy, cells, nx, ny, nz, 2*sigma_i);
+        draw_points(Ic, corners, strategy, cells, nx, ny, nz, 2*sigma_i+0.5);
         iio_save_image_float_vec(out_image, Ic, nx, ny, nz);
       }
 
