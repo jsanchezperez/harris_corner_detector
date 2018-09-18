@@ -39,6 +39,7 @@ extern "C"
 #define PAR_DEFAULT_PRECISION QUADRATIC_APPROXIMATION
 #define PAR_DEFAULT_VERBOSE 0
 
+
 /**
  *
  *  Print a help message 
